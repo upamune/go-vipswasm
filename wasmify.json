@@ -1,0 +1,62 @@
+{
+  "version": "1",
+  "upstream": {
+    "path": "tools/wasm"
+  },
+  "project": {
+    "name": "vipswasm",
+    "root_dir": "tools/wasm",
+    "language": "c++"
+  },
+  "build_system": {
+    "type": "make",
+    "files": [
+      "Makefile"
+    ]
+  },
+  "targets": [
+    {
+      "name": "vipswasm_core",
+      "type": "library",
+      "source_dirs": [
+        "tools/wasm"
+      ],
+      "public_headers": [
+        "tools/wasm/vipswasm.h"
+      ]
+    }
+  ],
+  "build_commands": {
+    "configure": null,
+    "build": "make wasm"
+  },
+  "user_selection": {
+    "target_name": "vipswasm_core",
+    "build_type": "library"
+  },
+  "bridge": {
+    "ExportFunctions": [
+      "vipswasm::version",
+      "vipswasm::resize_nearest",
+      "vipswasm::extract_area"
+    ]
+  },
+  "skip": {},
+  "phases": {
+    "gen-proto": {
+      "completed_at": "2026-05-07T16:36:08Z",
+      "output_files": [
+        "proto/vipswasm.proto",
+        "proto/wasmify/options.proto",
+        "bridge/api_bridge.cc",
+        "bridge/api_bridge.h"
+      ]
+    },
+    "parse-headers": {
+      "completed_at": "2026-05-07T16:36:08Z",
+      "output_files": [
+        "api-spec.json"
+      ]
+    }
+  }
+}

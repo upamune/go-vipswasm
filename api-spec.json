@@ -1,0 +1,338 @@
+{
+  "functions": [
+    {
+      "name": "extract_area",
+      "namespace": "vipswasm",
+      "qual_name": "vipswasm::extract_area",
+      "return_type": {
+        "name": "std::string",
+        "kind": "string",
+        "qual_type": "std::string"
+      },
+      "params": [
+        {
+          "name": "src",
+          "type": {
+            "name": "std::string",
+            "kind": "string",
+            "is_const": true,
+            "is_reference": true,
+            "qual_type": "const std::string \u0026"
+          }
+        },
+        {
+          "name": "src_width",
+          "type": {
+            "name": "uint32_t",
+            "kind": "primitive",
+            "qual_type": "uint32_t"
+          }
+        },
+        {
+          "name": "src_height",
+          "type": {
+            "name": "uint32_t",
+            "kind": "primitive",
+            "qual_type": "uint32_t"
+          }
+        },
+        {
+          "name": "left",
+          "type": {
+            "name": "uint32_t",
+            "kind": "primitive",
+            "qual_type": "uint32_t"
+          }
+        },
+        {
+          "name": "top",
+          "type": {
+            "name": "uint32_t",
+            "kind": "primitive",
+            "qual_type": "uint32_t"
+          }
+        },
+        {
+          "name": "width",
+          "type": {
+            "name": "uint32_t",
+            "kind": "primitive",
+            "qual_type": "uint32_t"
+          }
+        },
+        {
+          "name": "height",
+          "type": {
+            "name": "uint32_t",
+            "kind": "primitive",
+            "qual_type": "uint32_t"
+          }
+        }
+      ],
+      "source_file": "tools/wasm/vipswasm.h"
+    },
+    {
+      "name": "resize_nearest",
+      "namespace": "vipswasm",
+      "qual_name": "vipswasm::resize_nearest",
+      "return_type": {
+        "name": "std::string",
+        "kind": "string",
+        "qual_type": "std::string"
+      },
+      "params": [
+        {
+          "name": "src",
+          "type": {
+            "name": "std::string",
+            "kind": "string",
+            "is_const": true,
+            "is_reference": true,
+            "qual_type": "const std::string \u0026"
+          }
+        },
+        {
+          "name": "src_width",
+          "type": {
+            "name": "uint32_t",
+            "kind": "primitive",
+            "qual_type": "uint32_t"
+          }
+        },
+        {
+          "name": "src_height",
+          "type": {
+            "name": "uint32_t",
+            "kind": "primitive",
+            "qual_type": "uint32_t"
+          }
+        },
+        {
+          "name": "dst_width",
+          "type": {
+            "name": "uint32_t",
+            "kind": "primitive",
+            "qual_type": "uint32_t"
+          }
+        },
+        {
+          "name": "dst_height",
+          "type": {
+            "name": "uint32_t",
+            "kind": "primitive",
+            "qual_type": "uint32_t"
+          }
+        }
+      ],
+      "source_file": "tools/wasm/vipswasm.h"
+    },
+    {
+      "name": "version",
+      "namespace": "vipswasm",
+      "qual_name": "vipswasm::version",
+      "return_type": {
+        "name": "uint32_t",
+        "kind": "primitive",
+        "qual_type": "uint32_t"
+      },
+      "params": null,
+      "source_file": "tools/wasm/vipswasm.h"
+    },
+    {
+      "name": "vipswasm_alloc",
+      "qual_name": "vipswasm_alloc",
+      "return_type": {
+        "name": "void",
+        "kind": "void",
+        "is_pointer": true,
+        "qual_type": "void *"
+      },
+      "params": [
+        {
+          "name": "size",
+          "type": {
+            "name": "uint32_t",
+            "kind": "primitive",
+            "qual_type": "uint32_t"
+          }
+        }
+      ],
+      "source_file": "tools/wasm/vipswasm.h"
+    },
+    {
+      "name": "vipswasm_free",
+      "qual_name": "vipswasm_free",
+      "return_type": {
+        "name": "void",
+        "kind": "void",
+        "qual_type": "void"
+      },
+      "params": [
+        {
+          "name": "ptr",
+          "type": {
+            "name": "void",
+            "kind": "void",
+            "is_pointer": true,
+            "qual_type": "void *"
+          }
+        }
+      ],
+      "source_file": "tools/wasm/vipswasm.h"
+    },
+    {
+      "name": "vipswasm_extract_area",
+      "qual_name": "vipswasm_extract_area",
+      "return_type": {
+        "name": "int32_t",
+        "kind": "primitive",
+        "qual_type": "int32_t"
+      },
+      "params": [
+        {
+          "name": "src",
+          "type": {
+            "name": "uint8_t",
+            "kind": "primitive",
+            "is_const": true,
+            "is_pointer": true,
+            "qual_type": "const uint8_t *"
+          }
+        },
+        {
+          "name": "src_width",
+          "type": {
+            "name": "uint32_t",
+            "kind": "primitive",
+            "qual_type": "uint32_t"
+          }
+        },
+        {
+          "name": "src_height",
+          "type": {
+            "name": "uint32_t",
+            "kind": "primitive",
+            "qual_type": "uint32_t"
+          }
+        },
+        {
+          "name": "dst",
+          "type": {
+            "name": "uint8_t",
+            "kind": "primitive",
+            "is_pointer": true,
+            "qual_type": "uint8_t *"
+          }
+        },
+        {
+          "name": "left",
+          "type": {
+            "name": "uint32_t",
+            "kind": "primitive",
+            "qual_type": "uint32_t"
+          }
+        },
+        {
+          "name": "top",
+          "type": {
+            "name": "uint32_t",
+            "kind": "primitive",
+            "qual_type": "uint32_t"
+          }
+        },
+        {
+          "name": "width",
+          "type": {
+            "name": "uint32_t",
+            "kind": "primitive",
+            "qual_type": "uint32_t"
+          }
+        },
+        {
+          "name": "height",
+          "type": {
+            "name": "uint32_t",
+            "kind": "primitive",
+            "qual_type": "uint32_t"
+          }
+        }
+      ],
+      "source_file": "tools/wasm/vipswasm.h"
+    },
+    {
+      "name": "vipswasm_resize_nearest",
+      "qual_name": "vipswasm_resize_nearest",
+      "return_type": {
+        "name": "int32_t",
+        "kind": "primitive",
+        "qual_type": "int32_t"
+      },
+      "params": [
+        {
+          "name": "src",
+          "type": {
+            "name": "uint8_t",
+            "kind": "primitive",
+            "is_const": true,
+            "is_pointer": true,
+            "qual_type": "const uint8_t *"
+          }
+        },
+        {
+          "name": "src_width",
+          "type": {
+            "name": "uint32_t",
+            "kind": "primitive",
+            "qual_type": "uint32_t"
+          }
+        },
+        {
+          "name": "src_height",
+          "type": {
+            "name": "uint32_t",
+            "kind": "primitive",
+            "qual_type": "uint32_t"
+          }
+        },
+        {
+          "name": "dst",
+          "type": {
+            "name": "uint8_t",
+            "kind": "primitive",
+            "is_pointer": true,
+            "qual_type": "uint8_t *"
+          }
+        },
+        {
+          "name": "dst_width",
+          "type": {
+            "name": "uint32_t",
+            "kind": "primitive",
+            "qual_type": "uint32_t"
+          }
+        },
+        {
+          "name": "dst_height",
+          "type": {
+            "name": "uint32_t",
+            "kind": "primitive",
+            "qual_type": "uint32_t"
+          }
+        }
+      ],
+      "source_file": "tools/wasm/vipswasm.h"
+    },
+    {
+      "name": "vipswasm_version",
+      "qual_name": "vipswasm_version",
+      "return_type": {
+        "name": "uint32_t",
+        "kind": "primitive",
+        "qual_type": "uint32_t"
+      },
+      "params": null,
+      "source_file": "tools/wasm/vipswasm.h"
+    }
+  ],
+  "source_file": "tools/wasm/vipswasm.h"
+}

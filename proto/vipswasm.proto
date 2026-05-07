@@ -1,0 +1,61 @@
+syntax = "proto3";
+
+package wasmify.vipswasm;
+
+option go_package = "github.com/goccy/wasmify/gen/vipswasm";
+
+import "wasmify/options.proto";
+
+option (wasmify.wasm_cpp_namespace) = "vipswasm";
+
+message ExtractAreaRequest {
+  string src = 1;
+  uint32 src_width = 2;
+  uint32 src_height = 3;
+  uint32 left = 4;
+  uint32 top = 5;
+  uint32 width = 6;
+  uint32 height = 7;
+}
+
+message ExtractAreaResponse {
+  string result = 1;
+  string error = 15;
+}
+
+message ResizeNearestRequest {
+  string src = 1;
+  uint32 src_width = 2;
+  uint32 src_height = 3;
+  uint32 dst_width = 4;
+  uint32 dst_height = 5;
+}
+
+message ResizeNearestResponse {
+  string result = 1;
+  string error = 15;
+}
+
+message VersionRequest {
+}
+
+message VersionResponse {
+  uint32 result = 1;
+  string error = 15;
+}
+
+message Empty {}
+
+service Vipswasm {
+  option (wasmify.wasm_service_id) = 0;
+  option (wasmify.wasm_service_source_file) = "tools/wasm/vipswasm.h";
+  rpc ExtractArea(ExtractAreaRequest) returns (ExtractAreaResponse) {
+    option (wasmify.wasm_method_id) = 0;
+  }
+  rpc ResizeNearest(ResizeNearestRequest) returns (ResizeNearestResponse) {
+    option (wasmify.wasm_method_id) = 1;
+  }
+  rpc Version(VersionRequest) returns (VersionResponse) {
+    option (wasmify.wasm_method_id) = 2;
+  }
+}
