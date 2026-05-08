@@ -90,6 +90,40 @@ func TestRunWritesPNGFile(t *testing.T) {
 	}
 }
 
+func TestRunWritesWebPFile(t *testing.T) {
+	dir := t.TempDir()
+	input := filepath.Join(dir, "input.png")
+	output := filepath.Join(dir, "output.webp")
+	if err := os.WriteFile(input, testPNG(t), 0o644); err != nil {
+		t.Fatal(err)
+	}
+
+	var stdout, stderr bytes.Buffer
+	code := Run([]string{input, output}, &stdout, &stderr)
+	if code != 0 {
+		t.Fatalf("Run() = %d, stderr = %s", code, stderr.String())
+	}
+	got, err := os.ReadFile(output)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(got) < 12 || string(got[:4]) != "RIFF" || string(got[8:12]) != "WEBP" {
+		t.Fatalf("output is not WebP: % x", got[:min(len(got), 12)])
+	}
+}
+
+func TestRunWritesTIFFToStdout(t *testing.T) {
+	var stdout, stderr bytes.Buffer
+	code := run([]string{"-format", "tiff", "-", "-"}, bytes.NewReader(testPNG(t)), &stdout, &stderr)
+	if code != 0 {
+		t.Fatalf("run() = %d, stderr = %s", code, stderr.String())
+	}
+	got := stdout.Bytes()
+	if len(got) < 4 || !(string(got[:4]) == "II*\x00" || string(got[:4]) == "MM\x00*") {
+		t.Fatalf("stdout is not TIFF: % x", got[:min(len(got), 4)])
+	}
+}
+
 func TestRunDecodesStdinWithLibvipsPNGLoader(t *testing.T) {
 	var stdout, stderr bytes.Buffer
 	code := run([]string{"-libvips-input", "-format", "png", "-", "-"}, bytes.NewReader(testPNG(t)), &stdout, &stderr)
@@ -129,7 +163,7 @@ func TestShouldUseLibvipsInput(t *testing.T) {
 
 func TestRunRejectsUnknownFormat(t *testing.T) {
 	var stdout, stderr bytes.Buffer
-	code := Run([]string{"-format", "gif", "input.png", "-"}, &stdout, &stderr)
+	code := Run([]string{"-format", "heif", "input.png", "-"}, &stdout, &stderr)
 	if code != 2 {
 		t.Fatalf("Run() = %d, want 2", code)
 	}

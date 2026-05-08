@@ -57,8 +57,8 @@ func run(args []string, stdin io.Reader, stdout, stderr io.Writer) int {
 	var opts options
 	resize := fs.String("resize", "", "resize to WIDTHxHEIGHT with libvips nearest-neighbor sampling")
 	extract := fs.String("extract", "", "crop X,Y,WIDTH,HEIGHT before resizing")
-	fs.StringVar(&opts.format, "format", "", "output format: png or jpeg")
-	fs.IntVar(&opts.quality, "quality", 90, "JPEG quality from 1 to 100")
+	fs.StringVar(&opts.format, "format", "", "output format: png, jpeg, webp, tiff, or raw")
+	fs.IntVar(&opts.quality, "quality", 90, "JPEG/WebP quality from 1 to 100")
 	fs.BoolVar(&opts.libvipsInput, "libvips-input", false, "decode input with the embedded libvips foreign loader")
 	fs.BoolVar(&opts.libvipsPNGIn, "libvips-png-input", false, "decode PNG input with the embedded libvips PNG loader")
 
@@ -109,10 +109,11 @@ func usage(w io.Writer) {
 	fmt.Fprintln(w, "usage: convert_cli [flags] <input> <output>")
 	fmt.Fprintln(w)
 	fmt.Fprintln(w, "flags:")
-	fmt.Fprintln(w, "  -format png|jpeg          output format; required when output is -")
+	fmt.Fprintln(w, "  -format png|jpeg|webp|tiff|raw")
+	fmt.Fprintln(w, "                            output format; required when output is -")
 	fmt.Fprintln(w, "  -resize WIDTHxHEIGHT      resize with libvips nearest-neighbor sampling")
 	fmt.Fprintln(w, "  -extract X,Y,WIDTH,HEIGHT crop before resizing")
-	fmt.Fprintln(w, "  -quality 1..100           JPEG quality, default 90")
+	fmt.Fprintln(w, "  -quality 1..100           JPEG/WebP quality, default 90")
 	fmt.Fprintln(w, "  -libvips-input            decode input with the embedded libvips foreign loader")
 	fmt.Fprintln(w, "  -libvips-png-input        decode PNG input with the embedded libvips loader")
 	fmt.Fprintln(w)
@@ -209,7 +210,7 @@ func shouldUseFullCore(inputPath, outputFormat string) bool {
 	}
 	switch normalizeFormat(outputFormat) {
 	case "csv", "dz", "fit", "fits", "gif", "mat", "matrix", "nii", "nifti",
-		"raw", "uhdr":
+		"uhdr":
 		return true
 	default:
 		return false
@@ -302,7 +303,7 @@ func normalizeFormat(format string) string {
 
 func isOutputFormat(format string) bool {
 	switch format {
-	case "jpeg", "png":
+	case "jpeg", "png", "raw", "tiff", "webp":
 		return true
 	default:
 		return false

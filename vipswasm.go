@@ -445,9 +445,61 @@ func (e *Engine) EncodeImage(img *Image, format string, opts *EncodeOptions) ([]
 			return nil, err
 		}
 		return out.Bytes(), nil
+	case "raw", "tiff", "webp":
+		return e.encodeImageWithLibvips(img, format, opts)
 	default:
 		return nil, fmt.Errorf("%w: %s", ErrUnsupportedFormat, format)
 	}
+}
+
+func (e *Engine) encodeImageWithLibvips(img *Image, format string, opts *EncodeOptions) ([]byte, error) {
+	suffix, err := libvipsSaveSuffix(format, opts)
+	if err != nil {
+		return nil, err
+	}
+	e.mu.Lock()
+	defer e.mu.Unlock()
+	if e.closed {
+		return nil, ErrClosed
+	}
+	fn := e.module.ExportedFunction("vipswasm_save_rgba")
+	if fn == nil {
+		return nil, errors.New("vipswasm: wasm core is missing vipswasm_save_rgba export")
+	}
+	srcPtr, err := e.allocBytes(img.Pix)
+	if err != nil {
+		return nil, err
+	}
+	defer e.freePtr(srcPtr)
+	suffixPtr, err := e.allocBytes([]byte(suffix))
+	if err != nil {
+		return nil, err
+	}
+	defer e.freePtr(suffixPtr)
+	metaPtr, err := e.allocBytes(make([]byte, 8))
+	if err != nil {
+		return nil, err
+	}
+	defer e.freePtr(metaPtr)
+	ret, err := fn.Call(e.ctx, uint64(srcPtr), uint64(img.Width), uint64(img.Height), uint64(suffixPtr), uint64(len(suffix)), uint64(metaPtr), uint64(metaPtr+4))
+	if err != nil {
+		return nil, err
+	}
+	if int32(ret[0]) != 0 {
+		return nil, fmt.Errorf("vipswasm: failed to encode %s", format)
+	}
+	meta, ok := e.module.Memory().Read(metaPtr, 8)
+	if !ok {
+		return nil, errors.New("vipswasm: failed to read encode metadata")
+	}
+	outPtr := binary.LittleEndian.Uint32(meta[0:4])
+	outLen := binary.LittleEndian.Uint32(meta[4:8])
+	defer e.freePtr(outPtr)
+	out, ok := e.module.Memory().Read(outPtr, outLen)
+	if !ok {
+		return nil, errors.New("vipswasm: failed to read encode output")
+	}
+	return append([]byte(nil), out...), nil
 }
 
 // EncodePNG writes the image as PNG.
@@ -473,6 +525,33 @@ func (img *Image) EncodeJPEG(w io.Writer, opts *JPEGOptions) error {
 		return ErrInvalidGeometry
 	}
 	return jpeg.Encode(w, rgba, &jpeg.Options{Quality: quality})
+}
+
+func libvipsSaveSuffix(format string, opts *EncodeOptions) (string, error) {
+	format = normalizeFormat(format)
+	if format == "" {
+		return "", ErrInvalidImage
+	}
+	suffix := "." + format
+	if format == "jpeg" {
+		suffix = ".jpg"
+	}
+	quality := 0
+	if opts != nil {
+		quality = opts.Quality
+	}
+	if quality == 0 {
+		return suffix, nil
+	}
+	if quality < 1 || quality > 100 {
+		return "", ErrInvalidGeometry
+	}
+	switch format {
+	case "jpeg", "webp":
+		return fmt.Sprintf("%s[Q=%d]", suffix, quality), nil
+	default:
+		return suffix, nil
+	}
 }
 
 func normalizeFormat(format string) string {

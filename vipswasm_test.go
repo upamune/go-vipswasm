@@ -130,8 +130,32 @@ func TestDecodeAndEncodePNG(t *testing.T) {
 	if len(encodedPNG) < 8 || string(encodedPNG[:8]) != "\x89PNG\r\n\x1a\n" {
 		t.Fatalf("Engine.EncodeImage(png) did not return PNG")
 	}
-	if _, err := e.EncodeImage(img, "webp", nil); !errors.Is(err, ErrUnsupportedFormat) {
-		t.Fatalf("Engine.EncodeImage(webp) error = %v, want ErrUnsupportedFormat", err)
+	encodedRaw, err := e.EncodeImage(img, "raw", nil)
+	if err != nil {
+		t.Fatalf("Engine.EncodeImage(raw) error = %v", err)
+	}
+	if !bytes.Equal(encodedRaw, img.Pix) {
+		t.Fatalf("Engine.EncodeImage(raw) = %v, want %v", encodedRaw, img.Pix)
+	}
+
+	encodedWebP, err := e.EncodeImage(img, "webp", nil)
+	if err != nil {
+		t.Fatalf("Engine.EncodeImage(webp) error = %v", err)
+	}
+	if !isWebP(encodedWebP) {
+		t.Fatalf("Engine.EncodeImage(webp) did not return WebP")
+	}
+
+	encodedTIFF, err := e.EncodeImage(img, "tiff", nil)
+	if err != nil {
+		t.Fatalf("Engine.EncodeImage(tiff) error = %v", err)
+	}
+	if !isTIFF(encodedTIFF) {
+		t.Fatalf("Engine.EncodeImage(tiff) did not return TIFF")
+	}
+
+	if _, err := e.EncodeImage(img, "heif", nil); !errors.Is(err, ErrUnsupportedFormat) {
+		t.Fatalf("Engine.EncodeImage(heif) error = %v, want ErrUnsupportedFormat", err)
 	}
 }
 
@@ -171,6 +195,14 @@ func TestGeneratedOperationCatalogCoversForeignCodecs(t *testing.T) {
 			t.Fatalf("GeneratedOperations[%q].Category = %q, want %q", name, op.Category, category)
 		}
 	}
+}
+
+func isTIFF(b []byte) bool {
+	return len(b) >= 4 && (string(b[:4]) == "II*\x00" || string(b[:4]) == "MM\x00*")
+}
+
+func isWebP(b []byte) bool {
+	return len(b) >= 12 && string(b[:4]) == "RIFF" && string(b[8:12]) == "WEBP"
 }
 
 func TestNewImageFromRawRGBACopiesInput(t *testing.T) {

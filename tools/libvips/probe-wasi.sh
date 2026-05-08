@@ -88,6 +88,15 @@ fi
 if ! grep -q "vips_threadpool_run_wasi_inline" "$SRC/libvips/iofuncs/threadpool.c"; then
   perl -0pi -e 's/(\tpool->a = a;\n)/$1\n#ifdef __wasi__\n\t{\n\t\tVipsWorker worker = { pool, NULL, FALSE };\n\n\t\tg_private_set(&worker_key, &worker);\n\t\twhile (!pool->stop &&\n\t\t\t!worker.stop &&\n\t\t\t!pool->error) {\n\t\t\tVIPS_GATE_START("vips_threadpool_run_wasi_inline");\n\t\t\tvips_worker_work_unit(&worker);\n\t\t\tVIPS_GATE_STOP("vips_threadpool_run_wasi_inline");\n\n\t\t\tif (pool->stop ||\n\t\t\t\tworker.stop ||\n\t\t\t\tpool->error)\n\t\t\t\tbreak;\n\n\t\t\tif (progress &&\n\t\t\t\tprogress(pool->a))\n\t\t\t\tpool->error = TRUE;\n\t\t}\n\n\t\tg_mutex_lock(&pool->allocate_lock);\n\t\tVIPS_FREEF(g_object_unref, worker.state);\n\t\tg_mutex_unlock(&pool->allocate_lock);\n\t\tg_private_set(&worker_key, NULL);\n\n\t\tresult = pool->error ? -1 : 0;\n\t\tvips_threadpool_free(pool);\n\n\t\tif (!vips_image_get_typeof(im, "vips-no-minimise"))\n\t\t\tvips_image_minimise_all(im);\n\n\t\treturn result;\n\t}\n#endif\n/' "$SRC/libvips/iofuncs/threadpool.c"
 fi
+if ! grep -q "vips_threadset_run_wasi_inline" "$SRC/libvips/iofuncs/threadset.c"; then
+  perl -0pi -e 's/(\tif \(set->max_threads > 0\)\n\t\tfor \(int i = 0; i < set->max_threads; i\+\+\) \{)/#ifndef __wasi__\n$1/' "$SRC/libvips/iofuncs/threadset.c"
+  perl -0pi -e 's/(\n\treturn set;\n\})/\n#endif\n$1/' "$SRC/libvips/iofuncs/threadset.c"
+  perl -0pi -e 's/(\{\n\tVipsThreadExec \*task;\n)/$1\n#ifdef __wasi__\n\tVIPS_GATE_START("vips_threadset_run_wasi_inline");\n\tfunc(data, NULL);\n\tVIPS_GATE_STOP("vips_threadset_run_wasi_inline");\n\tvips_thread_shutdown();\n\treturn 0;\n#endif\n/' "$SRC/libvips/iofuncs/threadset.c"
+fi
+if ! grep -q "VIPS_WASI_SINKDISC_SYNC_WRITE" "$SRC/libvips/iofuncs/sinkdisc.c"; then
+  perl -0pi -e 's/(\t\/\* Make this last \(picks up parts of wbuffer on startup\)\.\n\t \*\/\n\tif \(vips_thread_execute\("wbuffer", wbuffer_write_thread, wbuffer\)\) \{\n\t\twbuffer_free\(wbuffer\);\n\t\treturn NULL;\n\t\}\n\n\twbuffer->running = TRUE;)/#ifndef __wasi__\n$1\n#else\n\t\/* VIPS_WASI_SINKDISC_SYNC_WRITE: WASI has no background writer thread. *\/\n\twbuffer->running = FALSE;\n#endif/' "$SRC/libvips/iofuncs/sinkdisc.c"
+  perl -0pi -e 's/(\t\/\* Set the background writer going for this buffer\.\n\t \*\/\n\tvips_semaphore_up\(&write->buf->go\);\n\n\treturn 0;)/#ifdef __wasi__\n\t\/* VIPS_WASI_SINKDISC_SYNC_WRITE: worker generation is already inline. *\/\n\tif \(write_check_error\(write\)\)\n\t\treturn -1;\n\twbuffer_write\(write->buf\);\n\tvips_semaphore_up\(&write->buf->done\);\n\treturn write_check_error\(write\);\n#else\n$1\n#endif/' "$SRC/libvips/iofuncs/sinkdisc.c"
+fi
 
 cross="$WORK/wasi-cross.ini"
 sed \

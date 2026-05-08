@@ -54,8 +54,9 @@ package edge. `Engine.DecodeImage` exercises libvips' foreign loaders inside
 the wasm runtime; `NewFull` selects the larger full-format core when a caller
 needs codecs that are not in the default artifact.
 Foreign loaders are exposed through the generic `Engine.DecodeImage` entry
-point. Foreign savers remain catalog/build artifacts for now; public encoding
-and the CLI intentionally support PNG/JPEG output only.
+point. Public encoding and the CLI support PNG/JPEG output plus the libvips
+foreign savers that run under the embedded WASI runtime today: WebP, TIFF, and
+raw RGBA.
 
 The default checked-in runtime is `internal/vipswasm.wasm`. The repository also
 includes `internal/vipswasm_full.wasm`, built by `make wasm-libvips-full`, for
@@ -140,11 +141,12 @@ Go API. It reads PNG/JPEG input through `vipswasm.Decode` by default, uses the
 embedded libvips foreign loader for non-standard input such as HEIC/HEIF/AVIF,
 WebP, TIFF, GIF, JPEG XL, JPEG 2000, PDF, SVG, and RAW, can force libvips decode
 with `-libvips-input`, applies `ExtractArea` before `ResizeNearest`, and writes
-PNG/JPEG output.
+PNG/JPEG/WebP/TIFF/raw output.
 
 ```sh
 go run ./examples/convert_cli input.png output.jpg
 go run ./examples/convert_cli input.heic output.jpg
+go run ./examples/convert_cli input.png output.webp
 go run ./examples/convert_cli -resize 320x240 input.png thumb.png
 go run ./examples/convert_cli -extract 10,10,200,120 -format jpeg input.png - > crop.jpg
 cat input.heic | go run ./examples/convert_cli -libvips-input -format png - - > roundtrip.png
@@ -152,10 +154,10 @@ cat input.heic | go run ./examples/convert_cli -libvips-input -format png - - > 
 
 Flags:
 
-- `-format png|jpeg`: output format. This is required when output is `-`.
+- `-format png|jpeg|webp|tiff|raw`: output format. This is required when output is `-`.
 - `-resize WIDTHxHEIGHT`: resize with libvips nearest-neighbor sampling.
 - `-extract X,Y,WIDTH,HEIGHT`: crop before resizing.
-- `-quality 1..100`: JPEG quality, default `90`.
+- `-quality 1..100`: JPEG/WebP quality, default `90`.
 - `-libvips-input`: decode input through the embedded libvips foreign loader.
 - `-libvips-png-input`: decode PNG input through the embedded libvips loader.
 
