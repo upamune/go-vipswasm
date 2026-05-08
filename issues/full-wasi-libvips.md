@@ -5,7 +5,7 @@
 `full` is intended to enable every libvips external image format and optional
 package that can reasonably be linked into the static WASI reactor.
 
-The initial `VIPSWASM_LIBVIPS_PRESET=full` probe enables:
+The initial `VIPSWASM_LIBVIPS_PRESET=full` target was intended to enable:
 
 - `archive`
 - `cfitsio`
@@ -42,18 +42,17 @@ The initial `VIPSWASM_LIBVIPS_PRESET=full` probe enables:
 The `full` preset now configures, builds `libvips.a`, and links
 `internal/vipswasm_full.wasm` as a static WASI reactor.
 
-The resulting full Meson configuration enables the expected external packages:
+The resulting full Meson configuration enables the external packages that are
+both linkable and loadable under wazero today:
 
 - `archive`
 - `cfitsio`
 - `cgif`
 - `exif`
 - `fftw`
-- `fontconfig`
 - `heif`
 - `highway`
 - `imagequant`
-- `jpeg`
 - `jpeg-xl`
 - `lcms`
 - `magick`
@@ -61,22 +60,16 @@ The resulting full Meson configuration enables the expected external packages:
 - `nifti`
 - `openexr`
 - `openjpeg`
-- `openslide`
 - `orc`
-- `pangocairo`
-- `poppler`
 - `quantizr`
-- `raw`
-- `rsvg`
 - `spng`
 - `tiff`
-- `uhdr`
 - `webp`
 
-`pdfium` is intentionally disabled. The available upstream binary distribution
-is a standalone `pdfium.wasm` plus JavaScript glue, not a static `libpdfium.a`
-that can be linked into this reactor. PDF support is provided through the
-static Poppler/Poppler-GLib backend instead.
+`pdfium` is intentionally disabled. JPEG, UHDR, fontconfig/Pango/Cairo,
+OpenSlide, Poppler/PDF, RAW camera formats, and librsvg/SVG are also disabled
+in the checked-in full artifact because their current WASI builds pull in
+exception/SJLJ or other runtime paths that do not load cleanly in wazero.
 
 ## Verification
 

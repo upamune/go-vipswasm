@@ -21,7 +21,7 @@ upgrading the generated bridge.
 
 `make wasm` builds the default embedded artifact through the current libvips
 WASI probe. `make wasm-libvips-full` builds `internal/vipswasm_full.wasm`, a
-larger static WASI reactor with the full libvips external-format preset.
+larger static WASI reactor with the extended libvips external-format preset.
 `make wasm-scaffold` is available only for the old lightweight RGBA scaffold
 build.
 
@@ -55,19 +55,19 @@ the wasm runtime; `NewFull` selects the larger full-format core when a caller
 needs codecs that are not in the default artifact.
 Foreign loaders are exposed through the generic `Engine.DecodeImage` entry
 point. Public encoding and the CLI support PNG/JPEG output plus the libvips
-foreign savers that run under the embedded WASI runtime today: WebP, TIFF, and
-raw RGBA.
+foreign savers that run under the embedded WASI runtime today: WebP, TIFF, raw
+RGBA, GIF, and JPEG 2000.
 
 The default checked-in runtime is `internal/vipswasm.wasm`. The repository also
 includes `internal/vipswasm_full.wasm`, built by `make wasm-libvips-full`, for
-validating the full static WASI libvips dependency graph. The full preset
-enables the reasonably linkable static external packages, including archive,
-CFITSIO, CGIF, EXIF, FFTW, fontconfig, HEIF/AVIF, highway, imagequant, JPEG,
-JPEG XL, LCMS, ImageMagick, MATIO, NIfTI, OpenEXR, OpenJPEG, OpenSlide,
-Pango/Cairo, Poppler, RAW, librsvg, TIFF, UHDR, and WebP. `pdfium` is disabled
-because the available upstream distribution is a standalone `pdfium.wasm` plus
-JavaScript glue rather than a static `libpdfium.a`; PDF support is provided by
-Poppler/Poppler-GLib.
+validating the extended static WASI libvips dependency graph. The extended
+preset enables the static external packages that are both linkable and loadable
+under wazero today, including archive, CFITSIO, CGIF, EXIF, FFTW, HEIF/AVIF,
+highway, imagequant, JPEG XL, LCMS, ImageMagick, MATIO, NIfTI, OpenEXR,
+OpenJPEG, TIFF, and WebP. JPEG, UHDR, fontconfig/Pango/Cairo, OpenSlide,
+Poppler/PDF, RAW camera formats, and librsvg/SVG are disabled in the checked-in
+full artifact because their current WASI builds pull in exception/SJLJ or other
+runtime paths that do not load cleanly in wazero.
 
 The current WASI libvips probe is reproducible:
 
@@ -139,14 +139,15 @@ return thumb.EncodePNG(output)
 `examples/convert_cli` is a complete command-line example built on the public
 Go API. It reads PNG/JPEG input through `vipswasm.Decode` by default, uses the
 embedded libvips foreign loader for non-standard input such as HEIC/HEIF/AVIF,
-WebP, TIFF, GIF, JPEG XL, JPEG 2000, PDF, SVG, and RAW, can force libvips decode
-with `-libvips-input`, applies `ExtractArea` before `ResizeNearest`, and writes
-PNG/JPEG/WebP/TIFF/raw output.
+WebP, TIFF, GIF, JPEG XL, JPEG 2000, OpenEXR, FITS, MAT, and NIfTI, can force
+libvips decode with `-libvips-input`, applies `ExtractArea` before
+`ResizeNearest`, and writes PNG/JPEG/WebP/TIFF/raw/GIF/JPEG 2000 output.
 
 ```sh
 go run ./examples/convert_cli input.png output.jpg
 go run ./examples/convert_cli input.heic output.jpg
 go run ./examples/convert_cli input.png output.webp
+go run ./examples/convert_cli input.heic output.jp2
 go run ./examples/convert_cli -resize 320x240 input.png thumb.png
 go run ./examples/convert_cli -extract 10,10,200,120 -format jpeg input.png - > crop.jpg
 cat input.heic | go run ./examples/convert_cli -libvips-input -format png - - > roundtrip.png
@@ -154,7 +155,7 @@ cat input.heic | go run ./examples/convert_cli -libvips-input -format png - - > 
 
 Flags:
 
-- `-format png|jpeg|webp|tiff|raw`: output format. This is required when output is `-`.
+- `-format png|jpeg|webp|tiff|raw|gif|jp2`: output format. This is required when output is `-`.
 - `-resize WIDTHxHEIGHT`: resize with libvips nearest-neighbor sampling.
 - `-extract X,Y,WIDTH,HEIGHT`: crop before resizing.
 - `-quality 1..100`: JPEG/WebP quality, default `90`.

@@ -151,7 +151,7 @@ func TestRunSupportsLegacyLibvipsPNGInputFlag(t *testing.T) {
 }
 
 func TestShouldUseLibvipsInput(t *testing.T) {
-	for _, path := range []string{"input.heic", "input.HEIF", "input.avif", "input.webp", "input.tiff", "input.gif", "input.jxl", "input.jp2"} {
+	for _, path := range []string{"input.heic", "input.HEIF", "input.avif", "input.webp", "input.tiff", "input.gif", "input.jxl", "input.jp2", "input.exr", "input.fits", "input.mat", "input.nii"} {
 		if !shouldUseLibvipsInput(path) {
 			t.Fatalf("shouldUseLibvipsInput(%q) = false, want true", path)
 		}
@@ -159,11 +159,30 @@ func TestShouldUseLibvipsInput(t *testing.T) {
 	if shouldUseLibvipsInput("input.jpg") {
 		t.Fatal("shouldUseLibvipsInput accepted jpg")
 	}
+	if shouldUseLibvipsInput("input.svg") {
+		t.Fatal("shouldUseLibvipsInput accepted svg")
+	}
+}
+
+func TestShouldUseFullCore(t *testing.T) {
+	for _, path := range []string{"input.exr", "input.fits", "input.mat", "input.nii"} {
+		if !shouldUseFullCore(path, "png") {
+			t.Fatalf("shouldUseFullCore(%q, png) = false, want true", path)
+		}
+	}
+	for _, format := range []string{"gif", "jp2"} {
+		if !shouldUseFullCore("input.png", format) {
+			t.Fatalf("shouldUseFullCore(input.png, %q) = false, want true", format)
+		}
+	}
+	if shouldUseFullCore("input.png", "webp") {
+		t.Fatal("shouldUseFullCore(input.png, webp) = true, want false")
+	}
 }
 
 func TestRunRejectsUnknownFormat(t *testing.T) {
 	var stdout, stderr bytes.Buffer
-	code := Run([]string{"-format", "heif", "input.png", "-"}, &stdout, &stderr)
+	code := Run([]string{"-format", "bmp", "input.png", "-"}, &stdout, &stderr)
 	if code != 2 {
 		t.Fatalf("Run() = %d, want 2", code)
 	}

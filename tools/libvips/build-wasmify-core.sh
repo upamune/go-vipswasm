@@ -261,7 +261,6 @@ mapfile -t libs < <(pkg-config --libs --static vips glib-2.0 gio-2.0 gobject-2.0
   -O3 \
   -fno-exceptions \
   -mno-atomics \
-  -mllvm -wasm-enable-sjlj \
   -mexec-model=reactor \
   -DVIPSWASM_USE_LIBVIPS \
   -D_WASI_EMULATED_PROCESS_CLOCKS \

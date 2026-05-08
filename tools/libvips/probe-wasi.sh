@@ -156,9 +156,9 @@ if [[ -d "$GLIB_BUILD/meson-uninstalled" ]]; then
 fi
 
 export PKG_CONFIG_PATH="$(IFS=:; echo "${pkg_config_paths[*]}"):${PKG_CONFIG_PATH:-}"
-export CFLAGS="-mllvm -wasm-enable-sjlj -I$EXPAT_PREFIX/include -I$LIBPNG_PREFIX/include -I$LIBARCHIVE_PREFIX/include -I$FFTW_PREFIX/include -I$IMAGEMAGICK_PREFIX/include -I$CFITSIO_PREFIX/include -I$LIBIMAGEQUANT_PREFIX/include -I$CGIF_PREFIX/include -I$LIBEXIF_PREFIX/include/libexif -I$LIBEXIF_PREFIX/include -I$LIBJPEG_PREFIX/include -I$LIBUHDR_PREFIX/include -I$LIBWEBP_PREFIX/include -I$PANGO_PREFIX/include -I$CAIRO_PREFIX/include -I$HARFBUZZ_PREFIX/include -I$FONTCONFIG_PREFIX/include -I$PIXMAN_PREFIX/include -I$FRIBIDI_PREFIX/include -I$FREETYPE_PREFIX/include/freetype2 -I$FREETYPE_PREFIX/include -I$LIBTIFF_PREFIX/include -I$LIBRSVG_PREFIX/include/librsvg-2.0 -I$OPENSLIDE_PREFIX/include/openslide -I$MATIO_PREFIX/include -I$NIFTI_PREFIX/include/nifti -I$LCMS_PREFIX/include -I$OPENEXR_PREFIX/include/OpenEXR -I$OPENEXR_PREFIX/include/Imath -I$OPENEXR_PREFIX/include -I$LIBRAW_PREFIX/include -I$HIGHWAY_PREFIX/include -I$BROTLI_PREFIX/include -I$LIBJXL_PREFIX/include -I$POPPLER_PREFIX/include/poppler/glib -I$POPPLER_PREFIX/include/poppler -I$POPPLER_PREFIX/include -I$OPENJPEG_PREFIX/include/openjpeg-2.5 -I$SQLITE_PREFIX/include -I$GDK_PIXBUF_PREFIX/include/gdk-pixbuf-2.0 -I$LIBCROCO_PREFIX/include/libcroco-0.6 -I$LIBXML2_PREFIX/include/libxml2 -I$LIBDE265_PREFIX/include -I$LIBHEIF_PREFIX/include -I$GLIB_STUB_INCLUDE ${CFLAGS:-}"
-export CXXFLAGS="-mllvm -wasm-enable-sjlj -I$EXPAT_PREFIX/include -I$LIBPNG_PREFIX/include -I$LIBARCHIVE_PREFIX/include -I$FFTW_PREFIX/include -I$IMAGEMAGICK_PREFIX/include -I$CFITSIO_PREFIX/include -I$LIBIMAGEQUANT_PREFIX/include -I$CGIF_PREFIX/include -I$LIBEXIF_PREFIX/include/libexif -I$LIBEXIF_PREFIX/include -I$LIBJPEG_PREFIX/include -I$LIBUHDR_PREFIX/include -I$LIBWEBP_PREFIX/include -I$PANGO_PREFIX/include -I$CAIRO_PREFIX/include -I$HARFBUZZ_PREFIX/include -I$FONTCONFIG_PREFIX/include -I$PIXMAN_PREFIX/include -I$FRIBIDI_PREFIX/include -I$FREETYPE_PREFIX/include/freetype2 -I$FREETYPE_PREFIX/include -I$LIBTIFF_PREFIX/include -I$LIBRSVG_PREFIX/include/librsvg-2.0 -I$OPENSLIDE_PREFIX/include/openslide -I$MATIO_PREFIX/include -I$NIFTI_PREFIX/include/nifti -I$LCMS_PREFIX/include -I$OPENEXR_PREFIX/include/OpenEXR -I$OPENEXR_PREFIX/include/Imath -I$OPENEXR_PREFIX/include -I$LIBRAW_PREFIX/include -I$HIGHWAY_PREFIX/include -I$BROTLI_PREFIX/include -I$LIBJXL_PREFIX/include -I$POPPLER_PREFIX/include/poppler/glib -I$POPPLER_PREFIX/include/poppler -I$POPPLER_PREFIX/include -I$OPENJPEG_PREFIX/include/openjpeg-2.5 -I$SQLITE_PREFIX/include -I$GDK_PIXBUF_PREFIX/include/gdk-pixbuf-2.0 -I$LIBCROCO_PREFIX/include/libcroco-0.6 -I$LIBXML2_PREFIX/include/libxml2 -I$LIBDE265_PREFIX/include -I$LIBHEIF_PREFIX/include -I$GLIB_STUB_INCLUDE ${CXXFLAGS:-}"
-export LDFLAGS="-mllvm -wasm-enable-sjlj -L$EXPAT_PREFIX/lib -L$LIBPNG_PREFIX/lib -L$LIBARCHIVE_PREFIX/lib -L$FFTW_PREFIX/lib -L$IMAGEMAGICK_PREFIX/lib -L$CFITSIO_PREFIX/lib -L$LIBIMAGEQUANT_PREFIX/lib -L$CGIF_PREFIX/lib -L$LIBEXIF_PREFIX/lib -L$LIBJPEG_PREFIX/lib -L$LIBUHDR_PREFIX/lib -L$LIBWEBP_PREFIX/lib -L$PANGO_PREFIX/lib -L$CAIRO_PREFIX/lib -L$HARFBUZZ_PREFIX/lib -L$FONTCONFIG_PREFIX/lib -L$PIXMAN_PREFIX/lib -L$FRIBIDI_PREFIX/lib -L$FREETYPE_PREFIX/lib -L$LIBTIFF_PREFIX/lib -L$LIBRSVG_PREFIX/lib -L$OPENSLIDE_PREFIX/lib -L$MATIO_PREFIX/lib -L$NIFTI_PREFIX/lib -L$LCMS_PREFIX/lib -L$OPENEXR_PREFIX/lib -L$LIBRAW_PREFIX/lib -L$HIGHWAY_PREFIX/lib -L$BROTLI_PREFIX/lib -L$LIBJXL_PREFIX/lib -L$POPPLER_PREFIX/lib -L$OPENJPEG_PREFIX/lib -L$SQLITE_PREFIX/lib -L$GDK_PIXBUF_PREFIX/lib -L$LIBCROCO_PREFIX/lib -L$LIBXML2_PREFIX/lib -L$LIBDE265_PREFIX/lib -L$LIBHEIF_PREFIX/lib -L$ZLIB_PREFIX/lib -L$PCRE2_PREFIX/lib -L$ICONV_PREFIX/lib -lsetjmp ${LDFLAGS:-}"
+export CFLAGS="-I$EXPAT_PREFIX/include -I$LIBPNG_PREFIX/include -I$LIBARCHIVE_PREFIX/include -I$FFTW_PREFIX/include -I$IMAGEMAGICK_PREFIX/include -I$CFITSIO_PREFIX/include -I$LIBIMAGEQUANT_PREFIX/include -I$CGIF_PREFIX/include -I$LIBEXIF_PREFIX/include/libexif -I$LIBEXIF_PREFIX/include -I$LIBJPEG_PREFIX/include -I$LIBUHDR_PREFIX/include -I$LIBWEBP_PREFIX/include -I$PANGO_PREFIX/include -I$CAIRO_PREFIX/include -I$HARFBUZZ_PREFIX/include -I$FONTCONFIG_PREFIX/include -I$PIXMAN_PREFIX/include -I$FRIBIDI_PREFIX/include -I$FREETYPE_PREFIX/include/freetype2 -I$FREETYPE_PREFIX/include -I$LIBTIFF_PREFIX/include -I$LIBRSVG_PREFIX/include/librsvg-2.0 -I$OPENSLIDE_PREFIX/include/openslide -I$MATIO_PREFIX/include -I$NIFTI_PREFIX/include/nifti -I$LCMS_PREFIX/include -I$OPENEXR_PREFIX/include/OpenEXR -I$OPENEXR_PREFIX/include/Imath -I$OPENEXR_PREFIX/include -I$LIBRAW_PREFIX/include -I$HIGHWAY_PREFIX/include -I$BROTLI_PREFIX/include -I$LIBJXL_PREFIX/include -I$POPPLER_PREFIX/include/poppler/glib -I$POPPLER_PREFIX/include/poppler -I$POPPLER_PREFIX/include -I$OPENJPEG_PREFIX/include/openjpeg-2.5 -I$SQLITE_PREFIX/include -I$GDK_PIXBUF_PREFIX/include/gdk-pixbuf-2.0 -I$LIBCROCO_PREFIX/include/libcroco-0.6 -I$LIBXML2_PREFIX/include/libxml2 -I$LIBDE265_PREFIX/include -I$LIBHEIF_PREFIX/include -I$GLIB_STUB_INCLUDE ${CFLAGS:-}"
+export CXXFLAGS="-I$EXPAT_PREFIX/include -I$LIBPNG_PREFIX/include -I$LIBARCHIVE_PREFIX/include -I$FFTW_PREFIX/include -I$IMAGEMAGICK_PREFIX/include -I$CFITSIO_PREFIX/include -I$LIBIMAGEQUANT_PREFIX/include -I$CGIF_PREFIX/include -I$LIBEXIF_PREFIX/include/libexif -I$LIBEXIF_PREFIX/include -I$LIBJPEG_PREFIX/include -I$LIBUHDR_PREFIX/include -I$LIBWEBP_PREFIX/include -I$PANGO_PREFIX/include -I$CAIRO_PREFIX/include -I$HARFBUZZ_PREFIX/include -I$FONTCONFIG_PREFIX/include -I$PIXMAN_PREFIX/include -I$FRIBIDI_PREFIX/include -I$FREETYPE_PREFIX/include/freetype2 -I$FREETYPE_PREFIX/include -I$LIBTIFF_PREFIX/include -I$LIBRSVG_PREFIX/include/librsvg-2.0 -I$OPENSLIDE_PREFIX/include/openslide -I$MATIO_PREFIX/include -I$NIFTI_PREFIX/include/nifti -I$LCMS_PREFIX/include -I$OPENEXR_PREFIX/include/OpenEXR -I$OPENEXR_PREFIX/include/Imath -I$OPENEXR_PREFIX/include -I$LIBRAW_PREFIX/include -I$HIGHWAY_PREFIX/include -I$BROTLI_PREFIX/include -I$LIBJXL_PREFIX/include -I$POPPLER_PREFIX/include/poppler/glib -I$POPPLER_PREFIX/include/poppler -I$POPPLER_PREFIX/include -I$OPENJPEG_PREFIX/include/openjpeg-2.5 -I$SQLITE_PREFIX/include -I$GDK_PIXBUF_PREFIX/include/gdk-pixbuf-2.0 -I$LIBCROCO_PREFIX/include/libcroco-0.6 -I$LIBXML2_PREFIX/include/libxml2 -I$LIBDE265_PREFIX/include -I$LIBHEIF_PREFIX/include -I$GLIB_STUB_INCLUDE ${CXXFLAGS:-}"
+export LDFLAGS="-L$EXPAT_PREFIX/lib -L$LIBPNG_PREFIX/lib -L$LIBARCHIVE_PREFIX/lib -L$FFTW_PREFIX/lib -L$IMAGEMAGICK_PREFIX/lib -L$CFITSIO_PREFIX/lib -L$LIBIMAGEQUANT_PREFIX/lib -L$CGIF_PREFIX/lib -L$LIBEXIF_PREFIX/lib -L$LIBJPEG_PREFIX/lib -L$LIBUHDR_PREFIX/lib -L$LIBWEBP_PREFIX/lib -L$PANGO_PREFIX/lib -L$CAIRO_PREFIX/lib -L$HARFBUZZ_PREFIX/lib -L$FONTCONFIG_PREFIX/lib -L$PIXMAN_PREFIX/lib -L$FRIBIDI_PREFIX/lib -L$FREETYPE_PREFIX/lib -L$LIBTIFF_PREFIX/lib -L$LIBRSVG_PREFIX/lib -L$OPENSLIDE_PREFIX/lib -L$MATIO_PREFIX/lib -L$NIFTI_PREFIX/lib -L$LCMS_PREFIX/lib -L$OPENEXR_PREFIX/lib -L$LIBRAW_PREFIX/lib -L$HIGHWAY_PREFIX/lib -L$BROTLI_PREFIX/lib -L$LIBJXL_PREFIX/lib -L$POPPLER_PREFIX/lib -L$OPENJPEG_PREFIX/lib -L$SQLITE_PREFIX/lib -L$GDK_PIXBUF_PREFIX/lib -L$LIBCROCO_PREFIX/lib -L$LIBXML2_PREFIX/lib -L$LIBDE265_PREFIX/lib -L$LIBHEIF_PREFIX/lib -L$ZLIB_PREFIX/lib -L$PCRE2_PREFIX/lib -L$ICONV_PREFIX/lib ${LDFLAGS:-}"
 
 feature_args=(
   -Dpng=enabled
@@ -188,11 +188,11 @@ case "$VIPSWASM_LIBVIPS_PRESET" in
       -Dcgif=enabled
       -Dexif=enabled
       -Dfftw=enabled
-      -Dfontconfig=enabled
+      -Dfontconfig=disabled
       -Dheif=enabled
       -Dhighway=enabled
       -Dimagequant=enabled
-      -Djpeg=enabled
+      -Djpeg=disabled
       -Djpeg-xl=enabled
       -Dlcms=enabled
       -Dmagick=enabled
@@ -200,17 +200,17 @@ case "$VIPSWASM_LIBVIPS_PRESET" in
       -Dnifti=enabled
       -Dopenexr=enabled
       -Dopenjpeg=enabled
-      -Dopenslide=enabled
+      -Dopenslide=disabled
       -Dorc=enabled
-      -Dpangocairo=enabled
+      -Dpangocairo=disabled
       -Dpdfium=disabled
-      -Dpoppler=enabled
+      -Dpoppler=disabled
       -Dquantizr=enabled
-      -Draw=enabled
-      -Drsvg=enabled
+      -Draw=disabled
+      -Drsvg=disabled
       -Dspng=enabled
       -Dtiff=enabled
-      -Duhdr=enabled
+      -Duhdr=disabled
       -Dwebp=enabled
     )
     ;;

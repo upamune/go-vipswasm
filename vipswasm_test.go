@@ -27,6 +27,22 @@ func TestEngineVersion(t *testing.T) {
 	}
 }
 
+func TestNewFullEngineVersion(t *testing.T) {
+	e, err := NewFull(context.Background())
+	if err != nil {
+		t.Fatalf("NewFull() error = %v", err)
+	}
+	defer e.Close()
+
+	got, err := e.Version()
+	if err != nil {
+		t.Fatalf("Version() error = %v", err)
+	}
+	if got.Major != 8 || got.Minor != 18 {
+		t.Fatalf("Version() = %+v, want libvips-compatible 8.18.x core", got)
+	}
+}
+
 func TestResizeNearest(t *testing.T) {
 	e := newTestEngine(t)
 	defer e.Close()
@@ -154,8 +170,46 @@ func TestDecodeAndEncodePNG(t *testing.T) {
 		t.Fatalf("Engine.EncodeImage(tiff) did not return TIFF")
 	}
 
-	if _, err := e.EncodeImage(img, "heif", nil); !errors.Is(err, ErrUnsupportedFormat) {
-		t.Fatalf("Engine.EncodeImage(heif) error = %v, want ErrUnsupportedFormat", err)
+	if _, err := e.EncodeImage(img, "bmp", nil); !errors.Is(err, ErrUnsupportedFormat) {
+		t.Fatalf("Engine.EncodeImage(bmp) error = %v, want ErrUnsupportedFormat", err)
+	}
+}
+
+func TestFullEncodeImageAdditionalLibvipsSavers(t *testing.T) {
+	e, err := NewFull(context.Background())
+	if err != nil {
+		t.Fatalf("NewFull() error = %v", err)
+	}
+	defer e.Close()
+
+	src := image.NewRGBA(image.Rect(0, 0, 4, 4))
+	for y := 0; y < 4; y++ {
+		for x := 0; x < 4; x++ {
+			src.SetRGBA(x, y, color.RGBA{R: uint8(x * 40), G: uint8(y * 40), B: 120, A: 255})
+		}
+	}
+	img, err := NewImageFromRGBA(src)
+	if err != nil {
+		t.Fatalf("NewImageFromRGBA() error = %v", err)
+	}
+
+	tests := []struct {
+		format string
+		valid  func([]byte) bool
+	}{
+		{format: "gif", valid: func(b []byte) bool { return len(b) >= 6 && (string(b[:6]) == "GIF87a" || string(b[:6]) == "GIF89a") }},
+		{format: "jp2", valid: func(b []byte) bool { return len(b) >= 12 && string(b[4:12]) == "jP  \r\n\x87\n" }},
+	}
+	for _, tt := range tests {
+		t.Run(tt.format, func(t *testing.T) {
+			encoded, err := e.EncodeImage(img, tt.format, nil)
+			if err != nil {
+				t.Fatalf("Engine.EncodeImage(%s) error = %v", tt.format, err)
+			}
+			if !tt.valid(encoded) {
+				t.Fatalf("Engine.EncodeImage(%s) returned unexpected header: % x", tt.format, encoded[:min(len(encoded), 16)])
+			}
+		})
 	}
 }
 

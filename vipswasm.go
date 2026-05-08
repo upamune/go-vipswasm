@@ -445,7 +445,7 @@ func (e *Engine) EncodeImage(img *Image, format string, opts *EncodeOptions) ([]
 			return nil, err
 		}
 		return out.Bytes(), nil
-	case "raw", "tiff", "webp":
+	case "gif", "jp2", "raw", "tiff", "webp":
 		return e.encodeImageWithLibvips(img, format, opts)
 	default:
 		return nil, fmt.Errorf("%w: %s", ErrUnsupportedFormat, format)

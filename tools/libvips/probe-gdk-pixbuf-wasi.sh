@@ -48,6 +48,7 @@ sed \
   -e "s|@WASI_SDK@|$WASI_SDK_PATH|g" \
   -e "s|@ROOT@|$ROOT|g" \
   "$ROOT/tools/libvips/wasi-cross.ini" > "$cross"
+perl -0pi -e "s/, '-mllvm', '-wasm-enable-sjlj'//g; s/, '-lsetjmp'//g" "$cross"
 GLIB_STUB_INCLUDE="$GLIB_STUB_INCLUDE" perl -0pi -e 'my $inc = $ENV{"GLIB_STUB_INCLUDE"}; s#c_args = \[([^\]]*)\]#c_args = [$1, '\''-I$inc'\'']#' "$cross"
 GLIB_STUB_INCLUDE="$GLIB_STUB_INCLUDE" perl -0pi -e 'my $inc = $ENV{"GLIB_STUB_INCLUDE"}; s#cpp_args = \[([^\]]*)\]#cpp_args = [$1, '\''-I$inc'\'']#' "$cross"
 
@@ -60,11 +61,11 @@ meson setup "$WORK/build" "$SRC" \
   --prefix "$PREFIX" \
   --wrap-mode=nofallback \
   -Dpng=enabled \
-  -Djpeg=enabled \
+  -Djpeg=disabled \
   -Dtiff=enabled \
   -Dgif=enabled \
   -Dothers=disabled \
-  -Dbuiltin_loaders=png,jpeg,gif,tiff \
+  -Dbuiltin_loaders=png,gif,tiff \
   -Dgio_sniffing=false \
   -Dintrospection=disabled \
   -Dgtk_doc=false \

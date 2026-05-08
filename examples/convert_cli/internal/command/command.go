@@ -57,7 +57,7 @@ func run(args []string, stdin io.Reader, stdout, stderr io.Writer) int {
 	var opts options
 	resize := fs.String("resize", "", "resize to WIDTHxHEIGHT with libvips nearest-neighbor sampling")
 	extract := fs.String("extract", "", "crop X,Y,WIDTH,HEIGHT before resizing")
-	fs.StringVar(&opts.format, "format", "", "output format: png, jpeg, webp, tiff, or raw")
+	fs.StringVar(&opts.format, "format", "", "output format: png, jpeg, webp, tiff, raw, gif, or jp2")
 	fs.IntVar(&opts.quality, "quality", 90, "JPEG/WebP quality from 1 to 100")
 	fs.BoolVar(&opts.libvipsInput, "libvips-input", false, "decode input with the embedded libvips foreign loader")
 	fs.BoolVar(&opts.libvipsPNGIn, "libvips-png-input", false, "decode PNG input with the embedded libvips PNG loader")
@@ -109,7 +109,7 @@ func usage(w io.Writer) {
 	fmt.Fprintln(w, "usage: convert_cli [flags] <input> <output>")
 	fmt.Fprintln(w)
 	fmt.Fprintln(w, "flags:")
-	fmt.Fprintln(w, "  -format png|jpeg|webp|tiff|raw")
+	fmt.Fprintln(w, "  -format png|jpeg|webp|tiff|raw|gif|jp2")
 	fmt.Fprintln(w, "                            output format; required when output is -")
 	fmt.Fprintln(w, "  -resize WIDTHxHEIGHT      resize with libvips nearest-neighbor sampling")
 	fmt.Fprintln(w, "  -extract X,Y,WIDTH,HEIGHT crop before resizing")
@@ -191,10 +191,10 @@ func decodeInput(engine *vipswasm.Engine, path string, input []byte, opts option
 
 func shouldUseLibvipsInput(path string) bool {
 	switch strings.ToLower(filepath.Ext(path)) {
-	case ".avif", ".cr2", ".csv", ".dng", ".exr", ".fit", ".fits", ".fts",
+	case ".avif", ".csv", ".exr", ".fit", ".fits", ".fts",
 		".gif", ".heic", ".heif", ".hdr", ".j2c", ".j2k", ".jp2", ".jxl",
-		".mat", ".nii", ".orf", ".pbm", ".pdf", ".pfm", ".pgm", ".pnm",
-		".ppm", ".rad", ".rw2", ".svg", ".tif", ".tiff", ".uhdr", ".v",
+		".mat", ".nii", ".pbm", ".pfm", ".pgm", ".pnm",
+		".ppm", ".rad", ".tif", ".tiff", ".v",
 		".vips", ".webp":
 		return true
 	default:
@@ -204,13 +204,11 @@ func shouldUseLibvipsInput(path string) bool {
 
 func shouldUseFullCore(inputPath, outputFormat string) bool {
 	switch strings.ToLower(filepath.Ext(inputPath)) {
-	case ".cr2", ".dng", ".exr", ".fts", ".fit", ".fits", ".mat", ".nii",
-		".orf", ".rw2", ".svg":
+	case ".exr", ".fts", ".fit", ".fits", ".mat", ".nii":
 		return true
 	}
 	switch normalizeFormat(outputFormat) {
-	case "csv", "dz", "fit", "fits", "gif", "mat", "matrix", "nii", "nifti",
-		"uhdr":
+	case "gif", "jp2":
 		return true
 	default:
 		return false
@@ -303,7 +301,7 @@ func normalizeFormat(format string) string {
 
 func isOutputFormat(format string) bool {
 	switch format {
-	case "jpeg", "png", "raw", "tiff", "webp":
+	case "gif", "jpeg", "jp2", "png", "raw", "tiff", "webp":
 		return true
 	default:
 		return false
