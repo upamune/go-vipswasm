@@ -3,6 +3,7 @@ package command
 import (
 	"bytes"
 	"context"
+	"errors"
 	"flag"
 	"fmt"
 	"io"
@@ -44,8 +45,13 @@ func Main() {
 // Run executes the image converter. It is separate from Main so tests can call
 // the command without terminating the process.
 func Run(args []string, stdout, stderr io.Writer) int {
+	return run(args, os.Stdin, stdout, stderr)
+}
+
+func run(args []string, stdin io.Reader, stdout, stderr io.Writer) int {
 	fs := flag.NewFlagSet("convert_cli", flag.ContinueOnError)
 	fs.SetOutput(stderr)
+	fs.Usage = func() { usage(stderr) }
 
 	var opts options
 	resize := fs.String("resize", "", "resize to WIDTHxHEIGHT with libvips nearest-neighbor sampling")
@@ -55,6 +61,9 @@ func Run(args []string, stdout, stderr io.Writer) int {
 	fs.BoolVar(&opts.libvipsPNGIn, "libvips-png-input", false, "decode PNG input with the embedded libvips PNG loader")
 
 	if err := fs.Parse(args); err != nil {
+		if errors.Is(err, flag.ErrHelp) {
+			return 0
+		}
 		return 2
 	}
 	rest := fs.Args()
@@ -87,7 +96,7 @@ func Run(args []string, stdout, stderr io.Writer) int {
 		return 2
 	}
 
-	if err := convert(context.Background(), rest[0], rest[1], opts, stdout); err != nil {
+	if err := convert(context.Background(), rest[0], rest[1], opts, stdin, stdout); err != nil {
 		fmt.Fprintf(stderr, "convert_cli: %v\n", err)
 		return 1
 	}
@@ -97,14 +106,21 @@ func Run(args []string, stdout, stderr io.Writer) int {
 func usage(w io.Writer) {
 	fmt.Fprintln(w, "usage: convert_cli [flags] <input> <output>")
 	fmt.Fprintln(w)
+	fmt.Fprintln(w, "flags:")
+	fmt.Fprintln(w, "  -format png|jpeg          output format; required when output is -")
+	fmt.Fprintln(w, "  -resize WIDTHxHEIGHT      resize with libvips nearest-neighbor sampling")
+	fmt.Fprintln(w, "  -extract X,Y,WIDTH,HEIGHT crop before resizing")
+	fmt.Fprintln(w, "  -quality 1..100           JPEG quality, default 90")
+	fmt.Fprintln(w, "  -libvips-png-input        decode PNG input with the embedded libvips loader")
+	fmt.Fprintln(w)
 	fmt.Fprintln(w, "examples:")
 	fmt.Fprintln(w, "  convert_cli input.png output.jpg")
 	fmt.Fprintln(w, "  convert_cli -resize 320x240 input.png thumb.png")
 	fmt.Fprintln(w, "  convert_cli -extract 10,10,200,120 -format jpeg input.png - > out.jpg")
 }
 
-func convert(ctx context.Context, inputPath, outputPath string, opts options, stdout io.Writer) error {
-	input, err := readInput(inputPath)
+func convert(ctx context.Context, inputPath, outputPath string, opts options, stdin io.Reader, stdout io.Writer) error {
+	input, err := readInput(inputPath, stdin)
 	if err != nil {
 		return err
 	}
@@ -115,7 +131,7 @@ func convert(ctx context.Context, inputPath, outputPath string, opts options, st
 	}
 	defer engine.Close()
 
-	img, err := decodeInput(engine, inputPath, input, opts)
+	img, err := decodeInput(engine, input, opts)
 	if err != nil {
 		return err
 	}
@@ -136,40 +152,66 @@ func convert(ctx context.Context, inputPath, outputPath string, opts options, st
 	if err != nil {
 		return err
 	}
-	out, closeOutput, err := outputWriter(outputPath, stdout)
-	if err != nil {
+	var encoded bytes.Buffer
+	if err := encodeOutput(img, &encoded, format, opts.quality); err != nil {
 		return err
 	}
-	if closeOutput != nil {
-		defer closeOutput()
-	}
-	return encodeOutput(img, out, format, opts.quality)
+	return writeOutput(outputPath, encoded.Bytes(), stdout)
 }
 
-func readInput(path string) ([]byte, error) {
+func readInput(path string, stdin io.Reader) ([]byte, error) {
 	if path == "-" {
-		return io.ReadAll(os.Stdin)
+		return io.ReadAll(stdin)
 	}
 	return os.ReadFile(path)
 }
 
-func decodeInput(engine *vipswasm.Engine, path string, input []byte, opts options) (*vipswasm.Image, error) {
-	if opts.libvipsPNGIn && strings.EqualFold(filepath.Ext(path), ".png") {
+func decodeInput(engine *vipswasm.Engine, input []byte, opts options) (*vipswasm.Image, error) {
+	if opts.libvipsPNGIn {
 		return engine.DecodePNG(input)
 	}
 	img, _, err := vipswasm.Decode(bytes.NewReader(input))
 	return img, err
 }
 
-func outputWriter(path string, stdout io.Writer) (io.Writer, func() error, error) {
+func writeOutput(path string, data []byte, stdout io.Writer) error {
 	if path == "-" {
-		return stdout, nil, nil
+		_, err := stdout.Write(data)
+		return err
 	}
-	file, err := os.Create(path)
+	return writeFileAtomic(path, data, 0o644)
+}
+
+func writeFileAtomic(path string, data []byte, perm os.FileMode) error {
+	dir := filepath.Dir(path)
+	base := filepath.Base(path)
+	file, err := os.CreateTemp(dir, "."+base+".tmp-*")
 	if err != nil {
-		return nil, nil, err
+		return err
 	}
-	return file, file.Close, nil
+	tmp := file.Name()
+	cleanup := true
+	defer func() {
+		if cleanup {
+			_ = os.Remove(tmp)
+		}
+	}()
+	if _, err := file.Write(data); err != nil {
+		_ = file.Close()
+		return err
+	}
+	if err := file.Chmod(perm); err != nil {
+		_ = file.Close()
+		return err
+	}
+	if err := file.Close(); err != nil {
+		return err
+	}
+	if err := os.Rename(tmp, path); err != nil {
+		return err
+	}
+	cleanup = false
+	return nil
 }
 
 func outputFormat(path, explicit string) (string, error) {
@@ -181,6 +223,9 @@ func outputFormat(path, explicit string) (string, error) {
 		case ".png":
 			format = "png"
 		}
+	}
+	if format == "" && path == "-" {
+		return "", fmt.Errorf("-format is required when output is -")
 	}
 	switch format {
 	case "jpg":

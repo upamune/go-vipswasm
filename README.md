@@ -19,9 +19,11 @@ make verify
 `WASMIFY_VERSION` from the Makefile. Override it only when intentionally
 upgrading the generated bridge.
 
-`make wasm` builds the embedded artifact through the current libvips WASI
-probe. `make wasm-scaffold` is available only for the old lightweight RGBA
-scaffold build.
+`make wasm` builds the default embedded artifact through the current libvips
+WASI probe. `make wasm-libvips-full` builds `internal/vipswasm_full.wasm`, a
+larger static WASI reactor with the full libvips external-format preset.
+`make wasm-scaffold` is available only for the old lightweight RGBA scaffold
+build.
 
 `make verify` rebuilds the libvips-linked wasm artifact, runs `go test ./...`, repeats the
 tests with `CGO_ENABLED=0`, checks that no dependency reports `CgoFiles`,
@@ -51,6 +53,17 @@ and `EncodeJPEG` helpers intentionally use Go's standard image packages at the
 package edge. `Engine.DecodePNG` additionally exercises libvips' PNG foreign
 loader inside the wasm runtime.
 
+The default checked-in runtime is `internal/vipswasm.wasm`. The repository also
+includes `internal/vipswasm_full.wasm`, built by `make wasm-libvips-full`, for
+validating the full static WASI libvips dependency graph. The full preset
+enables the reasonably linkable static external packages, including archive,
+CFITSIO, CGIF, EXIF, FFTW, fontconfig, HEIF/AVIF, highway, imagequant, JPEG,
+JPEG XL, LCMS, ImageMagick, MATIO, NIfTI, OpenEXR, OpenJPEG, OpenSlide,
+Pango/Cairo, Poppler, RAW, librsvg, TIFF, UHDR, and WebP. `pdfium` is disabled
+because the available upstream distribution is a standalone `pdfium.wasm` plus
+JavaScript glue rather than a static `libpdfium.a`; PDF support is provided by
+Poppler/Poppler-GLib.
+
 The current WASI libvips probe is reproducible:
 
 ```sh
@@ -66,6 +79,7 @@ direnv exec . make probe-libvips-image-new-wazero
 direnv exec . make probe-libvips-memory-wazero
 direnv exec . make probe-libvips-diagnose-wazero
 direnv exec . make wasm-libvips
+direnv exec . make wasm-libvips-full
 ```
 
 `probe-glib-wasi` builds GLib/GObject/GIO as static WASI archives without
@@ -114,3 +128,28 @@ if err != nil {
 }
 return thumb.EncodePNG(output)
 ```
+
+## CLI Example
+
+`examples/convert_cli` is a complete command-line example built on the public
+Go API. It reads PNG/JPEG input through `vipswasm.Decode` by default, can
+exercise the embedded libvips PNG loader with `-libvips-png-input`, applies
+`ExtractArea` before `ResizeNearest`, and writes PNG or JPEG output.
+
+```sh
+go run ./examples/convert_cli input.png output.jpg
+go run ./examples/convert_cli -resize 320x240 input.png thumb.png
+go run ./examples/convert_cli -extract 10,10,200,120 -format jpeg input.png - > crop.jpg
+cat input.png | go run ./examples/convert_cli -libvips-png-input -format png - - > roundtrip.png
+```
+
+Flags:
+
+- `-format png|jpeg`: output format. This is required when output is `-`.
+- `-resize WIDTHxHEIGHT`: resize with libvips nearest-neighbor sampling.
+- `-extract X,Y,WIDTH,HEIGHT`: crop before resizing.
+- `-quality 1..100`: JPEG quality, default `90`.
+- `-libvips-png-input`: decode PNG input through the embedded libvips loader.
+
+File outputs are written atomically so a failed conversion does not replace an
+existing destination. Use `-` for stdin or stdout.
