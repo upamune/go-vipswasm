@@ -24,6 +24,12 @@ if ! grep -q "VIPSWASM_WASI_NO_MKSTEMP" "$SRC/libheif/box.cc"; then
   perl -0pi -e 's/void Box_iloc::set_use_tmp_file\(bool flag\)\n\{\n  m_use_tmpfile = flag;\n  if \(flag\) \{/void Box_iloc::set_use_tmp_file(bool flag)\n{\n  m_use_tmpfile = flag;\n  if (flag) {\n#if defined(__wasi__)\n    \/\/ VIPSWASM_WASI_NO_MKSTEMP: HEIF decoding does not need this writing-only tmpfile path.\n    m_use_tmpfile = false;\n    return;\n#endif/' "$SRC/libheif/box.cc"
 fi
 perl -0pi -e 's/#if !defined\(_WIN32\)\n    strcpy\(m_tmp_filename, "\/tmp\/libheif-XXXXXX"\);\n    m_tmpfile_fd = mkstemp\(m_tmp_filename\);/#if !defined(_WIN32) \&\& !defined(__wasi__)\n    strcpy(m_tmp_filename, "\/tmp\/libheif-XXXXXX");\n    m_tmpfile_fd = mkstemp(m_tmp_filename);/' "$SRC/libheif/box.cc"
+if ! grep -q "VIPSWASM_WASI_LIBDE265_SINGLE_THREAD" "$SRC/libheif/plugins/decoder_libde265.cc"; then
+  perl -0pi -e 's/#if defined\(__EMSCRIPTEN__\)/#if defined(__EMSCRIPTEN__) || defined(__wasi__)\n  \/\/ VIPSWASM_WASI_LIBDE265_SINGLE_THREAD: worker threads are unavailable in the embedded WASI runtime./' "$SRC/libheif/plugins/decoder_libde265.cc"
+fi
+if ! grep -q "VIPSWASM_WASI_LIBHEIF_SINGLE_THREAD" "$SRC/libheif/context.h"; then
+  perl -0pi -e 's/int m_max_decoding_threads = 4;/\/\/ VIPSWASM_WASI_LIBHEIF_SINGLE_THREAD: decode tiles in the main thread under WASI.\n#if defined(__wasi__)\n  int m_max_decoding_threads = 0;\n#else\n  int m_max_decoding_threads = 4;\n#endif/' "$SRC/libheif/context.h"
+fi
 
 export PKG_CONFIG_PATH="$LIBDE265_PREFIX/lib/pkgconfig:${PKG_CONFIG_PATH:-}"
 cmake -S "$SRC" -B "$WORK/build" \

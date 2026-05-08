@@ -114,6 +114,14 @@ func TestDecodeAndEncodePNG(t *testing.T) {
 	}
 	assertRGBA(t, out, 0, 0, color.RGBA{R: 1, G: 2, B: 3, A: 255})
 	assertRGBA(t, out, 1, 0, color.RGBA{R: 4, G: 5, B: 6, A: 255})
+
+	generic, err := e.DecodeImage(encoded.Bytes())
+	if err != nil {
+		t.Fatalf("Engine.DecodeImage() error = %v", err)
+	}
+	if generic.Width != 2 || generic.Height != 1 {
+		t.Fatalf("Engine.DecodeImage() size = %dx%d, want 2x1", generic.Width, generic.Height)
+	}
 }
 
 func TestGeneratedOperationCatalogCoversForeignCodecs(t *testing.T) {
@@ -126,6 +134,8 @@ func TestGeneratedOperationCatalogCoversForeignCodecs(t *testing.T) {
 		"jpegsave":     "foreign",
 		"pngload":      "foreign",
 		"pngsave":      "foreign",
+		"heifload":     "foreign",
+		"heifsave":     "foreign",
 	}
 	got := make(map[string]VipsOperation, len(GeneratedOperations))
 	for _, op := range GeneratedOperations {

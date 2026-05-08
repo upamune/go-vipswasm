@@ -29,6 +29,9 @@ int32_t vipswasm_extract_area(const uint8_t* src, uint32_t src_width,
                               uint32_t src_height, uint8_t* dst,
                               uint32_t left, uint32_t top,
                               uint32_t width, uint32_t height);
+int32_t vipswasm_load_rgba(const uint8_t* src, uint32_t src_len,
+                           uint8_t** dst, uint32_t* dst_len,
+                           uint32_t* width, uint32_t* height);
 int32_t vipswasm_pngload_rgba(const uint8_t* src, uint32_t src_len,
                               uint8_t** dst, uint32_t* dst_len,
                               uint32_t* width, uint32_t* height);

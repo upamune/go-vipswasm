@@ -132,15 +132,17 @@ return thumb.EncodePNG(output)
 ## CLI Example
 
 `examples/convert_cli` is a complete command-line example built on the public
-Go API. It reads PNG/JPEG input through `vipswasm.Decode` by default, can
-exercise the embedded libvips PNG loader with `-libvips-png-input`, applies
-`ExtractArea` before `ResizeNearest`, and writes PNG or JPEG output.
+Go API. It reads PNG/JPEG input through `vipswasm.Decode` by default, uses the
+embedded libvips foreign loader for HEIC/HEIF/AVIF input, can force libvips
+decode with `-libvips-input`, applies `ExtractArea` before `ResizeNearest`, and
+writes PNG or JPEG output.
 
 ```sh
 go run ./examples/convert_cli input.png output.jpg
+go run ./examples/convert_cli input.heic output.jpg
 go run ./examples/convert_cli -resize 320x240 input.png thumb.png
 go run ./examples/convert_cli -extract 10,10,200,120 -format jpeg input.png - > crop.jpg
-cat input.png | go run ./examples/convert_cli -libvips-png-input -format png - - > roundtrip.png
+cat input.heic | go run ./examples/convert_cli -libvips-input -format png - - > roundtrip.png
 ```
 
 Flags:
@@ -149,6 +151,7 @@ Flags:
 - `-resize WIDTHxHEIGHT`: resize with libvips nearest-neighbor sampling.
 - `-extract X,Y,WIDTH,HEIGHT`: crop before resizing.
 - `-quality 1..100`: JPEG quality, default `90`.
+- `-libvips-input`: decode input through the embedded libvips foreign loader.
 - `-libvips-png-input`: decode PNG input through the embedded libvips loader.
 
 File outputs are written atomically so a failed conversion does not replace an

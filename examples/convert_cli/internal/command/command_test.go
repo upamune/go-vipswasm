@@ -70,7 +70,7 @@ func TestRunWritesPNGToStdout(t *testing.T) {
 
 func TestRunDecodesStdinWithLibvipsPNGLoader(t *testing.T) {
 	var stdout, stderr bytes.Buffer
-	code := run([]string{"-libvips-png-input", "-format", "png", "-", "-"}, bytes.NewReader(testPNG(t)), &stdout, &stderr)
+	code := run([]string{"-libvips-input", "-format", "png", "-", "-"}, bytes.NewReader(testPNG(t)), &stdout, &stderr)
 	if code != 0 {
 		t.Fatalf("run() = %d, stderr = %s", code, stderr.String())
 	}
@@ -80,6 +80,28 @@ func TestRunDecodesStdinWithLibvipsPNGLoader(t *testing.T) {
 	}
 	if got.Bounds().Dx() != 2 || got.Bounds().Dy() != 2 {
 		t.Fatalf("stdout image size = %dx%d, want 2x2", got.Bounds().Dx(), got.Bounds().Dy())
+	}
+}
+
+func TestRunSupportsLegacyLibvipsPNGInputFlag(t *testing.T) {
+	var stdout, stderr bytes.Buffer
+	code := run([]string{"-libvips-png-input", "-format", "png", "-", "-"}, bytes.NewReader(testPNG(t)), &stdout, &stderr)
+	if code != 0 {
+		t.Fatalf("run() = %d, stderr = %s", code, stderr.String())
+	}
+	if _, err := png.Decode(bytes.NewReader(stdout.Bytes())); err != nil {
+		t.Fatal(err)
+	}
+}
+
+func TestShouldUseLibvipsInput(t *testing.T) {
+	for _, path := range []string{"input.heic", "input.HEIF", "input.avif"} {
+		if !shouldUseLibvipsInput(path) {
+			t.Fatalf("shouldUseLibvipsInput(%q) = false, want true", path)
+		}
+	}
+	if shouldUseLibvipsInput("input.jpg") {
+		t.Fatal("shouldUseLibvipsInput accepted jpg")
 	}
 }
 

@@ -36,6 +36,84 @@ uint8_t* copy_to_malloc(const void* src, size_t len) {
   return out;
 }
 
+int32_t image_to_rgba(VipsImage* loaded, uint8_t** dst, uint32_t* dst_len,
+                      uint32_t* width, uint32_t* height) {
+  if (loaded == nullptr || dst == nullptr || dst_len == nullptr ||
+      width == nullptr || height == nullptr) {
+    return -1;
+  }
+
+  VipsImage* work = loaded;
+  if (work->BandFmt != VIPS_FORMAT_UCHAR) {
+    VipsImage* casted = nullptr;
+    if (vips_cast(work, &casted, VIPS_FORMAT_UCHAR, nullptr) != 0 ||
+        casted == nullptr) {
+      g_object_unref(work);
+      return -1;
+    }
+    g_object_unref(work);
+    work = casted;
+  }
+
+  if (work->Bands < 3) {
+    VipsImage* rgb = nullptr;
+    if (vips_colourspace(work, &rgb, VIPS_INTERPRETATION_sRGB, nullptr) != 0 ||
+        rgb == nullptr) {
+      g_object_unref(work);
+      return -1;
+    }
+    g_object_unref(work);
+    work = rgb;
+  }
+
+  if (work->Bands == 3) {
+    VipsImage* with_alpha = nullptr;
+    double alpha = 255.0;
+    if (vips_bandjoin_const(work, &with_alpha, &alpha, 1, nullptr) != 0 ||
+        with_alpha == nullptr) {
+      g_object_unref(work);
+      return -1;
+    }
+    g_object_unref(work);
+    work = with_alpha;
+  } else if (work->Bands > 4) {
+    VipsImage* first_four = nullptr;
+    if (vips_extract_band(work, &first_four, 0, "n", 4, nullptr) != 0 ||
+        first_four == nullptr) {
+      g_object_unref(work);
+      return -1;
+    }
+    g_object_unref(work);
+    work = first_four;
+  }
+
+  if (work->Bands != 4) {
+    g_object_unref(work);
+    return -1;
+  }
+
+  size_t len = 0;
+  void* pixels = vips_image_write_to_memory(work, &len);
+  const uint32_t image_width = static_cast<uint32_t>(work->Xsize);
+  const uint32_t image_height = static_cast<uint32_t>(work->Ysize);
+  g_object_unref(work);
+  uint8_t* copied = vipswasm::copy_to_malloc(pixels, len);
+  if (pixels != nullptr) {
+    g_free(pixels);
+  }
+  if (copied == nullptr || len > UINT32_MAX) {
+    if (copied != nullptr) {
+      std::free(copied);
+    }
+    return -1;
+  }
+  *dst = copied;
+  *dst_len = static_cast<uint32_t>(len);
+  *width = image_width;
+  *height = image_height;
+  return 0;
+}
+
 #endif
 
 }  // namespace
@@ -106,76 +184,34 @@ int32_t vipswasm_pngload_rgba(const uint8_t* src, uint32_t src_len,
     return -1;
   }
   g_object_unref(source);
+  return vipswasm::image_to_rgba(loaded, dst, dst_len, width, height);
+#else
+  return -1;
+#endif
+}
 
-  VipsImage* work = loaded;
-  if (work->BandFmt != VIPS_FORMAT_UCHAR) {
-    VipsImage* casted = nullptr;
-    if (vips_cast(work, &casted, VIPS_FORMAT_UCHAR, nullptr) != 0 ||
-        casted == nullptr) {
-      g_object_unref(loaded);
-      return -1;
-    }
-    g_object_unref(work);
-    work = casted;
-  }
-
-  if (work->Bands < 3) {
-    VipsImage* rgb = nullptr;
-    if (vips_colourspace(work, &rgb, VIPS_INTERPRETATION_sRGB, nullptr) != 0 ||
-        rgb == nullptr) {
-      g_object_unref(work);
-      return -1;
-    }
-    g_object_unref(work);
-    work = rgb;
-  }
-
-  if (work->Bands == 3) {
-    VipsImage* with_alpha = nullptr;
-    double alpha = 255.0;
-    if (vips_bandjoin_const(work, &with_alpha, &alpha, 1, nullptr) != 0 ||
-        with_alpha == nullptr) {
-      g_object_unref(work);
-      return -1;
-    }
-    g_object_unref(work);
-    work = with_alpha;
-  } else if (work->Bands > 4) {
-    VipsImage* first_four = nullptr;
-    if (vips_extract_band(work, &first_four, 0, "n", 4, nullptr) != 0 ||
-        first_four == nullptr) {
-      g_object_unref(work);
-      return -1;
-    }
-    g_object_unref(work);
-    work = first_four;
-  }
-
-  if (work->Bands != 4) {
-    g_object_unref(work);
+WASM_EXPORT(vipswasm_load_rgba)
+int32_t vipswasm_load_rgba(const uint8_t* src, uint32_t src_len,
+                           uint8_t** dst, uint32_t* dst_len,
+                           uint32_t* width, uint32_t* height) {
+  if (src == nullptr || src_len == 0 || dst == nullptr || dst_len == nullptr ||
+      width == nullptr || height == nullptr) {
     return -1;
   }
+  *dst = nullptr;
+  *dst_len = 0;
+  *width = 0;
+  *height = 0;
 
-  size_t len = 0;
-  void* pixels = vips_image_write_to_memory(work, &len);
-  const uint32_t image_width = static_cast<uint32_t>(work->Xsize);
-  const uint32_t image_height = static_cast<uint32_t>(work->Ysize);
-  g_object_unref(work);
-  uint8_t* copied = vipswasm::copy_to_malloc(pixels, len);
-  if (pixels != nullptr) {
-    g_free(pixels);
-  }
-  if (copied == nullptr || len > UINT32_MAX) {
-    if (copied != nullptr) {
-      std::free(copied);
-    }
+#ifdef VIPSWASM_USE_LIBVIPS
+  if (!vipswasm::ensure_vips()) {
     return -1;
   }
-  *dst = copied;
-  *dst_len = static_cast<uint32_t>(len);
-  *width = image_width;
-  *height = image_height;
-  return 0;
+  VipsImage* loaded = vips_image_new_from_buffer(src, src_len, "", nullptr);
+  if (loaded == nullptr) {
+    return -1;
+  }
+  return vipswasm::image_to_rgba(loaded, dst, dst_len, width, height);
 #else
   return -1;
 #endif

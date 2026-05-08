@@ -125,6 +125,20 @@ var GeneratedOperations = []VipsOperation{
 		Inputs:   []string{"in", "target"},
 		Outputs:  nil,
 	},
+	{
+		Name:     "heifload",
+		Nick:     "load a HEIF image",
+		Category: "foreign",
+		Inputs:   []string{"source"},
+		Outputs:  []string{"out"},
+	},
+	{
+		Name:     "heifsave",
+		Nick:     "save image in HEIF format",
+		Category: "foreign",
+		Inputs:   []string{"in", "target"},
+		Outputs:  nil,
+	},
 }
 
 // New starts an Engine backed by the embedded WebAssembly core.
@@ -255,8 +269,17 @@ func Decode(r io.Reader) (*Image, string, error) {
 	return img, format, nil
 }
 
+// DecodeImage decodes image bytes through the embedded libvips foreign loader.
+func (e *Engine) DecodeImage(data []byte) (*Image, error) {
+	return e.decodeRGBA("vipswasm_load_rgba", data)
+}
+
 // DecodePNG decodes PNG bytes through the embedded libvips PNG loader.
 func (e *Engine) DecodePNG(data []byte) (*Image, error) {
+	return e.decodeRGBA("vipswasm_pngload_rgba", data)
+}
+
+func (e *Engine) decodeRGBA(export string, data []byte) (*Image, error) {
 	if len(data) == 0 {
 		return nil, ErrInvalidImage
 	}
@@ -266,9 +289,9 @@ func (e *Engine) DecodePNG(data []byte) (*Image, error) {
 	if e.closed {
 		return nil, ErrClosed
 	}
-	fn := e.module.ExportedFunction("vipswasm_pngload_rgba")
+	fn := e.module.ExportedFunction(export)
 	if fn == nil {
-		return nil, errors.New("vipswasm: wasm core is missing vipswasm_pngload_rgba export")
+		return nil, fmt.Errorf("vipswasm: wasm core is missing %s export", export)
 	}
 	srcPtr, err := e.allocBytes(data)
 	if err != nil {

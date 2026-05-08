@@ -20,6 +20,7 @@ type options struct {
 	resize       geometry
 	extract      area
 	quality      int
+	libvipsInput bool
 	libvipsPNGIn bool
 }
 
@@ -58,6 +59,7 @@ func run(args []string, stdin io.Reader, stdout, stderr io.Writer) int {
 	extract := fs.String("extract", "", "crop X,Y,WIDTH,HEIGHT before resizing")
 	fs.StringVar(&opts.format, "format", "", "output format: png or jpeg")
 	fs.IntVar(&opts.quality, "quality", 90, "JPEG quality from 1 to 100")
+	fs.BoolVar(&opts.libvipsInput, "libvips-input", false, "decode input with the embedded libvips foreign loader")
 	fs.BoolVar(&opts.libvipsPNGIn, "libvips-png-input", false, "decode PNG input with the embedded libvips PNG loader")
 
 	if err := fs.Parse(args); err != nil {
@@ -111,6 +113,7 @@ func usage(w io.Writer) {
 	fmt.Fprintln(w, "  -resize WIDTHxHEIGHT      resize with libvips nearest-neighbor sampling")
 	fmt.Fprintln(w, "  -extract X,Y,WIDTH,HEIGHT crop before resizing")
 	fmt.Fprintln(w, "  -quality 1..100           JPEG quality, default 90")
+	fmt.Fprintln(w, "  -libvips-input            decode input with the embedded libvips foreign loader")
 	fmt.Fprintln(w, "  -libvips-png-input        decode PNG input with the embedded libvips loader")
 	fmt.Fprintln(w)
 	fmt.Fprintln(w, "examples:")
@@ -131,7 +134,7 @@ func convert(ctx context.Context, inputPath, outputPath string, opts options, st
 	}
 	defer engine.Close()
 
-	img, err := decodeInput(engine, input, opts)
+	img, err := decodeInput(engine, inputPath, input, opts)
 	if err != nil {
 		return err
 	}
@@ -166,12 +169,24 @@ func readInput(path string, stdin io.Reader) ([]byte, error) {
 	return os.ReadFile(path)
 }
 
-func decodeInput(engine *vipswasm.Engine, input []byte, opts options) (*vipswasm.Image, error) {
+func decodeInput(engine *vipswasm.Engine, path string, input []byte, opts options) (*vipswasm.Image, error) {
+	if opts.libvipsInput || shouldUseLibvipsInput(path) {
+		return engine.DecodeImage(input)
+	}
 	if opts.libvipsPNGIn {
 		return engine.DecodePNG(input)
 	}
 	img, _, err := vipswasm.Decode(bytes.NewReader(input))
 	return img, err
+}
+
+func shouldUseLibvipsInput(path string) bool {
+	switch strings.ToLower(filepath.Ext(path)) {
+	case ".avif", ".heic", ".heif":
+		return true
+	default:
+		return false
+	}
 }
 
 func writeOutput(path string, data []byte, stdout io.Writer) error {

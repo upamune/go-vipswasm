@@ -1,7 +1,9 @@
 {
   "version": "1",
   "upstream": {
-    "path": "tools/wasm"
+    "path": "tools/wasm",
+    "commit": "c61bfdc05d32c1516112155351e4c347b9264288",
+    "branch": "main"
   },
   "project": {
     "name": "vipswasm",
@@ -44,7 +46,8 @@
   "skip": {},
   "phases": {
     "gen-proto": {
-      "completed_at": "2026-05-07T16:36:08Z",
+      "completed_at": "2026-05-08T05:13:58Z",
+      "upstream_commit": "c61bfdc05d32c1516112155351e4c347b9264288",
       "output_files": [
         "proto/vipswasm.proto",
         "proto/wasmify/options.proto",
@@ -53,7 +56,8 @@
       ]
     },
     "parse-headers": {
-      "completed_at": "2026-05-07T16:36:08Z",
+      "completed_at": "2026-05-08T05:13:58Z",
+      "upstream_commit": "c61bfdc05d32c1516112155351e4c347b9264288",
       "output_files": [
         "api-spec.json"
       ]
