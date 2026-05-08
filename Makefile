@@ -61,7 +61,7 @@ probe-libvips-default-wasi: probe-expat-wasi probe-libpng-wasi probe-libwebp-was
 		tools/libvips/probe-wasi.sh
 
 .PHONY: probe-libvips-full-wasi
-probe-libvips-full-wasi: probe-expat-wasi probe-libpng-wasi probe-glib-wasi ## Probe a full libvips WASI cross build.
+probe-libvips-full-wasi: probe-expat-wasi probe-libpng-wasi probe-libarchive-wasi probe-fftw-wasi probe-imagemagick-wasi probe-cfitsio-wasi probe-libimagequant-wasi probe-cgif-wasi probe-libexif-wasi probe-libjpeg-wasi probe-libuhdr-wasi probe-libwebp-wasi probe-libtiff-wasi probe-pango-wasi probe-librsvg-wasi probe-openslide-wasi probe-matio-wasi probe-nifti-wasi probe-lcms-wasi probe-openexr-wasi probe-libraw-wasi probe-highway-wasi probe-poppler-wasi probe-libjxl-wasi probe-libheif-wasi probe-glib-wasi ## Probe a full libvips WASI cross build.
 	VIPSWASM_LIBVIPS_PRESET=full \
 		LIBVIPS_PROBE_DIR=.wasmify/libvips-full-probe \
 		tools/libvips/probe-wasi.sh
@@ -130,6 +130,14 @@ probe-libjpeg-wasi: ## Probe a static libjpeg-turbo WASI build.
 probe-libwebp-wasi: ## Probe a static libwebp WASI build.
 	tools/libvips/probe-libwebp-wasi.sh
 
+.PHONY: probe-brotli-wasi
+probe-brotli-wasi: ## Probe a static Brotli WASI build.
+	tools/libvips/probe-brotli-wasi.sh
+
+.PHONY: probe-libjxl-wasi
+probe-libjxl-wasi: probe-brotli-wasi probe-highway-wasi probe-lcms-wasi probe-zlib-wasi probe-libpng-wasi ## Probe a static JPEG XL WASI build.
+	tools/libvips/probe-libjxl-wasi.sh
+
 .PHONY: probe-libtiff-wasi
 probe-libtiff-wasi: probe-zlib-wasi probe-libwebp-wasi ## Probe a static libtiff WASI build.
 	tools/libvips/probe-libtiff-wasi.sh
@@ -141,6 +149,122 @@ probe-libde265-wasi: ## Probe a static libde265 WASI build.
 .PHONY: probe-libheif-wasi
 probe-libheif-wasi: probe-libde265-wasi ## Probe a static libheif WASI build.
 	tools/libvips/probe-libheif-wasi.sh
+
+.PHONY: probe-libarchive-wasi
+probe-libarchive-wasi: probe-zlib-wasi ## Probe a static libarchive WASI build.
+	tools/libvips/probe-libarchive-wasi.sh
+
+.PHONY: probe-fftw-wasi
+probe-fftw-wasi: ## Probe a static FFTW WASI build.
+	tools/libvips/probe-fftw-wasi.sh
+
+.PHONY: probe-imagemagick-wasi
+probe-imagemagick-wasi: ## Probe a static ImageMagick MagickCore WASI build.
+	tools/libvips/probe-imagemagick-wasi.sh
+
+.PHONY: probe-cfitsio-wasi
+probe-cfitsio-wasi: probe-zlib-wasi ## Probe a static CFITSIO WASI build.
+	tools/libvips/probe-cfitsio-wasi.sh
+
+.PHONY: probe-libimagequant-wasi
+probe-libimagequant-wasi: ## Probe a static libimagequant WASI build.
+	tools/libvips/probe-libimagequant-wasi.sh
+
+.PHONY: probe-cgif-wasi
+probe-cgif-wasi: ## Probe a static cgif WASI build.
+	tools/libvips/probe-cgif-wasi.sh
+
+.PHONY: probe-libexif-wasi
+probe-libexif-wasi: ## Probe a static libexif WASI build.
+	tools/libvips/probe-libexif-wasi.sh
+
+.PHONY: probe-libuhdr-wasi
+probe-libuhdr-wasi: probe-libjpeg-wasi ## Probe a static libultrahdr WASI build.
+	tools/libvips/probe-libuhdr-wasi.sh
+
+.PHONY: probe-freetype-wasi
+probe-freetype-wasi: probe-zlib-wasi ## Probe a static FreeType WASI build.
+	tools/libvips/probe-freetype-wasi.sh
+
+.PHONY: probe-fribidi-wasi
+probe-fribidi-wasi: ## Probe a static FriBidi WASI build.
+	tools/libvips/probe-fribidi-wasi.sh
+
+.PHONY: probe-pixman-wasi
+probe-pixman-wasi: ## Probe a static Pixman WASI build.
+	tools/libvips/probe-pixman-wasi.sh
+
+.PHONY: probe-fontconfig-wasi
+probe-fontconfig-wasi: probe-expat-wasi probe-freetype-wasi ## Probe a static Fontconfig WASI build.
+	tools/libvips/probe-fontconfig-wasi.sh
+
+.PHONY: probe-harfbuzz-wasi
+probe-harfbuzz-wasi: probe-freetype-wasi probe-glib-wasi ## Probe a static HarfBuzz WASI build.
+	tools/libvips/probe-harfbuzz-wasi.sh
+
+.PHONY: probe-cairo-wasi
+probe-cairo-wasi: probe-expat-wasi probe-fontconfig-wasi probe-freetype-wasi probe-libpng-wasi probe-pixman-wasi probe-glib-wasi ## Probe a static Cairo WASI build.
+	tools/libvips/probe-cairo-wasi.sh
+
+.PHONY: probe-pango-wasi
+probe-pango-wasi: probe-cairo-wasi probe-fontconfig-wasi probe-freetype-wasi probe-fribidi-wasi probe-harfbuzz-wasi probe-glib-wasi ## Probe a static Pango/PangoCairo WASI build.
+	tools/libvips/probe-pango-wasi.sh
+
+.PHONY: probe-libxml2-wasi
+probe-libxml2-wasi: probe-iconv-wasi probe-zlib-wasi ## Probe a static libxml2 WASI build.
+	tools/libvips/probe-libxml2-wasi.sh
+
+.PHONY: probe-libcroco-wasi
+probe-libcroco-wasi: probe-libxml2-wasi probe-glib-wasi ## Probe a static libcroco WASI build.
+	tools/libvips/probe-libcroco-wasi.sh
+
+.PHONY: probe-gdk-pixbuf-wasi
+probe-gdk-pixbuf-wasi: probe-libjpeg-wasi probe-libpng-wasi probe-libtiff-wasi probe-glib-wasi ## Probe a static gdk-pixbuf WASI build.
+	tools/libvips/probe-gdk-pixbuf-wasi.sh
+
+.PHONY: probe-librsvg-wasi
+probe-librsvg-wasi: probe-gdk-pixbuf-wasi probe-libcroco-wasi probe-libxml2-wasi probe-pango-wasi probe-cairo-wasi probe-glib-wasi ## Probe a static librsvg WASI build.
+	tools/libvips/probe-librsvg-wasi.sh
+
+.PHONY: probe-openjpeg-wasi
+probe-openjpeg-wasi: probe-zlib-wasi probe-libpng-wasi probe-libtiff-wasi probe-libjpeg-wasi ## Probe a static OpenJPEG WASI build.
+	tools/libvips/probe-openjpeg-wasi.sh
+
+.PHONY: probe-sqlite-wasi
+probe-sqlite-wasi: ## Probe a static SQLite WASI build.
+	tools/libvips/probe-sqlite-wasi.sh
+
+.PHONY: probe-openslide-wasi
+probe-openslide-wasi: probe-openjpeg-wasi probe-sqlite-wasi probe-gdk-pixbuf-wasi probe-libxml2-wasi probe-cairo-wasi probe-glib-wasi ## Probe a static OpenSlide WASI build.
+	tools/libvips/probe-openslide-wasi.sh
+
+.PHONY: probe-matio-wasi
+probe-matio-wasi: probe-zlib-wasi ## Probe a static MATIO WASI build.
+	tools/libvips/probe-matio-wasi.sh
+
+.PHONY: probe-nifti-wasi
+probe-nifti-wasi: probe-zlib-wasi ## Probe a static NIfTI WASI build.
+	tools/libvips/probe-nifti-wasi.sh
+
+.PHONY: probe-lcms-wasi
+probe-lcms-wasi: ## Probe a static LittleCMS WASI build.
+	tools/libvips/probe-lcms-wasi.sh
+
+.PHONY: probe-openexr-wasi
+probe-openexr-wasi: probe-zlib-wasi ## Probe a static OpenEXR WASI build.
+	tools/libvips/probe-openexr-wasi.sh
+
+.PHONY: probe-libraw-wasi
+probe-libraw-wasi: probe-zlib-wasi probe-lcms-wasi probe-libjpeg-wasi ## Probe a static LibRaw WASI build.
+	tools/libvips/probe-libraw-wasi.sh
+
+.PHONY: probe-highway-wasi
+probe-highway-wasi: ## Probe a static Highway WASI build.
+	tools/libvips/probe-highway-wasi.sh
+
+.PHONY: probe-poppler-wasi
+probe-poppler-wasi: probe-cairo-wasi probe-fontconfig-wasi probe-freetype-wasi probe-libjpeg-wasi probe-libpng-wasi probe-openjpeg-wasi probe-lcms-wasi probe-glib-wasi ## Probe a static Poppler GLib WASI build.
+	tools/libvips/probe-poppler-wasi.sh
 
 .PHONY: probe-expat-wasi
 probe-expat-wasi: ## Probe a static Expat WASI build.

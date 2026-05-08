@@ -364,7 +364,7 @@ INI
 
 export PKG_CONFIG_PATH="$ICONV_PREFIX/lib/pkgconfig:$PCRE2_PREFIX/lib/pkgconfig$ffi_pkg_config_path:$ZLIB_PREFIX/lib/pkgconfig:${PKG_CONFIG_PATH:-}"
 
-patch_marker="$WORK/.source-patched"
+patch_marker="$WORK/.source-patched-v2"
 if [[ ! -f "$patch_marker" ]]; then
 if ! grep -q "libiconv = declare_dependency" "$SRC/meson.build"; then
   iconv_lib="${ICONV_PREFIX}/lib"
@@ -426,6 +426,7 @@ cat > "$SRC/glib/gwakeup.c" <<'C'
 
 #ifdef GLIB_COMPILATION
 #include "gtypes.h"
+#include "gmain.h"
 #include "gpoll.h"
 #include "gmem.h"
 #else

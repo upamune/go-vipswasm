@@ -37,39 +37,49 @@ The initial `VIPSWASM_LIBVIPS_PRESET=full` probe enables:
 - `uhdr`
 - `webp`
 
-## Current Blocker
+## Status
 
-`direnv exec . make wasm-libvips-full` currently stops during Meson configure
-because `libarchive` is not available for the WASI pkg-config path.
+The `full` preset now configures, builds `libvips.a`, and links
+`internal/vipswasm_full.wasm` as a static WASI reactor.
 
-A direct static WASI build probe of libarchive 3.8.2 with zlib enabled also
-failed. The compile errors come from POSIX APIs that are not available in the
-current WASI SDK/sysroot path:
+The resulting full Meson configuration enables the expected external packages:
 
-- `fchdir`
-- `dup`
-- `getpwuid`
-- `getgrgid`
-- incomplete `struct passwd`
-- incomplete `struct group`
+- `archive`
+- `cfitsio`
+- `cgif`
+- `exif`
+- `fftw`
+- `fontconfig`
+- `heif`
+- `highway`
+- `imagequant`
+- `jpeg`
+- `jpeg-xl`
+- `lcms`
+- `magick`
+- `matio`
+- `nifti`
+- `openexr`
+- `openjpeg`
+- `openslide`
+- `orc`
+- `pangocairo`
+- `poppler`
+- `quantizr`
+- `raw`
+- `rsvg`
+- `spng`
+- `tiff`
+- `uhdr`
+- `webp`
 
-## Notes
+`pdfium` is intentionally disabled. The available upstream binary distribution
+is a standalone `pdfium.wasm` plus JavaScript glue, not a static `libpdfium.a`
+that can be linked into this reactor. PDF support is provided through the
+static Poppler/Poppler-GLib backend instead.
 
-This means `full` is not just a matter of adding pkg-config paths. Several
-dependencies will need WASI-specific configuration or patches before the full
-preset can produce a usable `internal/vipswasm_full.wasm`.
+## Verification
 
-The pragmatic path is to finish a smaller `default` preset first:
-
-- PNG
-- WebP
-- TIFF
-- HEIC/HEIF
-
-JPEG is not in `default` yet. libvips' JPEG loader/saver includes `setjmp.h`,
-and the WASI SDK requires `-mllvm -wasm-enable-sjlj` plus an engine that
-supports WebAssembly exception handling for `setjmp/longjmp`. That should be
-treated as part of the later expanded/full work rather than silently changing
-the runtime requirement for the default artifact.
-
-Then grow `full` one dependency family at a time.
+The full artifact has been checked so that its imports are limited to
+`wasi_snapshot_preview1`; libvips and codec symbols are linked into the module
+rather than left as host imports.
