@@ -1,6 +1,7 @@
 package vipswasm
 
 import (
+	"bytes"
 	"context"
 	"encoding/binary"
 	"errors"
@@ -11,6 +12,7 @@ import (
 	"image/png"
 	"io"
 	"math"
+	"strings"
 	"sync"
 
 	"github.com/tetratelabs/wazero"
@@ -54,6 +56,11 @@ type Image struct {
 
 // JPEGOptions configures EncodeJPEG.
 type JPEGOptions struct {
+	Quality int
+}
+
+// EncodeOptions configures Engine.EncodeImage.
+type EncodeOptions struct {
 	Quality int
 }
 
@@ -139,12 +146,95 @@ var GeneratedOperations = []VipsOperation{
 		Inputs:   []string{"in", "target"},
 		Outputs:  nil,
 	},
+	{
+		Name:     "webpload",
+		Nick:     "load WebP from a source",
+		Category: "foreign",
+		Inputs:   []string{"source"},
+		Outputs:  []string{"out"},
+	},
+	{
+		Name:     "webpsave",
+		Nick:     "save image as WebP",
+		Category: "foreign",
+		Inputs:   []string{"in", "target"},
+		Outputs:  nil,
+	},
+	{
+		Name:     "tiffload",
+		Nick:     "load TIFF from a source",
+		Category: "foreign",
+		Inputs:   []string{"source"},
+		Outputs:  []string{"out"},
+	},
+	{
+		Name:     "tiffsave",
+		Nick:     "save image as TIFF",
+		Category: "foreign",
+		Inputs:   []string{"in", "target"},
+		Outputs:  nil,
+	},
+	{
+		Name:     "gifload",
+		Nick:     "load GIF from a source",
+		Category: "foreign",
+		Inputs:   []string{"source"},
+		Outputs:  []string{"out"},
+	},
+	{
+		Name:     "gifsave",
+		Nick:     "save image as GIF",
+		Category: "foreign",
+		Inputs:   []string{"in", "target"},
+		Outputs:  nil,
+	},
+	{
+		Name:     "jxlload",
+		Nick:     "load JPEG XL from a source",
+		Category: "foreign",
+		Inputs:   []string{"source"},
+		Outputs:  []string{"out"},
+	},
+	{
+		Name:     "jxlsave",
+		Nick:     "save image as JPEG XL",
+		Category: "foreign",
+		Inputs:   []string{"in", "target"},
+		Outputs:  nil,
+	},
+	{
+		Name:     "jp2kload",
+		Nick:     "load JPEG 2000 from a source",
+		Category: "foreign",
+		Inputs:   []string{"source"},
+		Outputs:  []string{"out"},
+	},
+	{
+		Name:     "jp2ksave",
+		Nick:     "save image as JPEG 2000",
+		Category: "foreign",
+		Inputs:   []string{"in", "target"},
+		Outputs:  nil,
+	},
 }
 
 // New starts an Engine backed by the embedded WebAssembly core.
 func New(ctx context.Context) (*Engine, error) {
+	return NewWithWasm(ctx, internal.Wasm)
+}
+
+// NewFull starts an Engine backed by the larger full-format WebAssembly core.
+func NewFull(ctx context.Context) (*Engine, error) {
+	return NewWithWasm(ctx, internal.FullWasm)
+}
+
+// NewWithWasm starts an Engine backed by caller-supplied WebAssembly bytes.
+func NewWithWasm(ctx context.Context, wasm []byte) (*Engine, error) {
 	if ctx == nil {
 		ctx = context.Background()
+	}
+	if len(wasm) == 0 {
+		return nil, errors.New("vipswasm: empty wasm core")
 	}
 
 	rt := wazero.NewRuntime(ctx)
@@ -167,7 +257,7 @@ func New(ctx context.Context) (*Engine, error) {
 		return nil, err
 	}
 
-	mod, err := rt.Instantiate(ctx, internal.Wasm)
+	mod, err := rt.Instantiate(ctx, wasm)
 	if err != nil {
 		_ = rt.Close(ctx)
 		return nil, err
@@ -330,6 +420,82 @@ func (e *Engine) decodeRGBA(export string, data []byte) (*Image, error) {
 	return &Image{Pix: append([]byte(nil), pix...), Width: width, Height: height}, nil
 }
 
+// EncodeImage encodes an image in the requested format. PNG and JPEG use the
+// same Go encoders as EncodePNG and EncodeJPEG; other formats use the embedded
+// libvips foreign saver when the wasm core supports it.
+func (e *Engine) EncodeImage(img *Image, format string, opts *EncodeOptions) ([]byte, error) {
+	if err := img.validate(); err != nil {
+		return nil, err
+	}
+	switch normalizeFormat(format) {
+	case "png":
+		var out bytes.Buffer
+		if err := img.EncodePNG(&out); err != nil {
+			return nil, err
+		}
+		return out.Bytes(), nil
+	case "jpeg":
+		var out bytes.Buffer
+		quality := 0
+		if opts != nil {
+			quality = opts.Quality
+		}
+		if err := img.EncodeJPEG(&out, &JPEGOptions{Quality: quality}); err != nil {
+			return nil, err
+		}
+		return out.Bytes(), nil
+	}
+	suffix, err := libvipsSaveSuffix(format, opts)
+	if err != nil {
+		return nil, err
+	}
+
+	e.mu.Lock()
+	defer e.mu.Unlock()
+	if e.closed {
+		return nil, ErrClosed
+	}
+	fn := e.module.ExportedFunction("vipswasm_save_rgba")
+	if fn == nil {
+		return nil, errors.New("vipswasm: wasm core is missing vipswasm_save_rgba export")
+	}
+	srcPtr, err := e.allocBytes(img.Pix)
+	if err != nil {
+		return nil, err
+	}
+	defer e.freePtr(srcPtr)
+	suffixPtr, err := e.allocBytes([]byte(suffix))
+	if err != nil {
+		return nil, err
+	}
+	defer e.freePtr(suffixPtr)
+	metaPtr, err := e.allocBytes(make([]byte, 8))
+	if err != nil {
+		return nil, err
+	}
+	defer e.freePtr(metaPtr)
+
+	ret, err := fn.Call(e.ctx, uint64(srcPtr), uint64(img.Width), uint64(img.Height), uint64(suffixPtr), uint64(len(suffix)), uint64(metaPtr), uint64(metaPtr+4))
+	if err != nil {
+		return nil, err
+	}
+	if int32(ret[0]) != 0 {
+		return nil, fmt.Errorf("vipswasm: failed to encode %s", format)
+	}
+	meta, ok := e.module.Memory().Read(metaPtr, 8)
+	if !ok {
+		return nil, errors.New("vipswasm: failed to read encode metadata")
+	}
+	outPtr := binary.LittleEndian.Uint32(meta[0:4])
+	outLen := binary.LittleEndian.Uint32(meta[4:8])
+	defer e.freePtr(outPtr)
+	out, ok := e.module.Memory().Read(outPtr, outLen)
+	if !ok {
+		return nil, errors.New("vipswasm: failed to read encode output")
+	}
+	return append([]byte(nil), out...), nil
+}
+
 // EncodePNG writes the image as PNG.
 func (img *Image) EncodePNG(w io.Writer) error {
 	rgba, err := img.ToRGBA()
@@ -353,6 +519,47 @@ func (img *Image) EncodeJPEG(w io.Writer, opts *JPEGOptions) error {
 		return ErrInvalidGeometry
 	}
 	return jpeg.Encode(w, rgba, &jpeg.Options{Quality: quality})
+}
+
+func libvipsSaveSuffix(format string, opts *EncodeOptions) (string, error) {
+	format = normalizeFormat(format)
+	if format == "" {
+		return "", ErrInvalidImage
+	}
+	suffix := "." + format
+	if format == "jpeg" {
+		suffix = ".jpg"
+	}
+	quality := 0
+	if opts != nil {
+		quality = opts.Quality
+	}
+	if quality == 0 {
+		return suffix, nil
+	}
+	if quality < 1 || quality > 100 {
+		return "", ErrInvalidGeometry
+	}
+	switch format {
+	case "jpeg", "webp", "heif", "heic", "avif", "jxl", "jp2", "j2k":
+		return fmt.Sprintf("%s[Q=%d]", suffix, quality), nil
+	default:
+		return suffix, nil
+	}
+}
+
+func normalizeFormat(format string) string {
+	format = strings.ToLower(strings.TrimSpace(strings.TrimPrefix(format, ".")))
+	switch format {
+	case "jpg":
+		return "jpeg"
+	case "tif":
+		return "tiff"
+	case "j2c", "j2k":
+		return "jp2"
+	default:
+		return format
+	}
 }
 
 // ToRGBA copies the image into image.RGBA.

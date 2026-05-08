@@ -35,6 +35,10 @@ int32_t vipswasm_load_rgba(const uint8_t* src, uint32_t src_len,
 int32_t vipswasm_pngload_rgba(const uint8_t* src, uint32_t src_len,
                               uint8_t** dst, uint32_t* dst_len,
                               uint32_t* width, uint32_t* height);
+int32_t vipswasm_save_rgba(const uint8_t* src, uint32_t src_width,
+                           uint32_t src_height, const char* suffix,
+                           uint32_t suffix_len, uint8_t** dst,
+                           uint32_t* dst_len);
 
 #ifdef __cplusplus
 }

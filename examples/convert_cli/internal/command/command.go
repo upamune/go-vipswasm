@@ -128,7 +128,12 @@ func convert(ctx context.Context, inputPath, outputPath string, opts options, st
 		return err
 	}
 
-	engine, err := vipswasm.New(ctx)
+	format, err := outputFormat(outputPath, opts.format)
+	if err != nil {
+		return err
+	}
+
+	engine, err := newEngine(ctx, inputPath, format)
 	if err != nil {
 		return err
 	}
@@ -151,15 +156,18 @@ func convert(ctx context.Context, inputPath, outputPath string, opts options, st
 		}
 	}
 
-	format, err := outputFormat(outputPath, opts.format)
-	if err != nil {
-		return err
-	}
 	var encoded bytes.Buffer
-	if err := encodeOutput(img, &encoded, format, opts.quality); err != nil {
+	if err := encodeOutput(engine, img, &encoded, format, opts.quality); err != nil {
 		return err
 	}
 	return writeOutput(outputPath, encoded.Bytes(), stdout)
+}
+
+func newEngine(ctx context.Context, inputPath, outputFormat string) (*vipswasm.Engine, error) {
+	if shouldUseFullCore(inputPath, outputFormat) {
+		return vipswasm.NewFull(ctx)
+	}
+	return vipswasm.New(ctx)
 }
 
 func readInput(path string, stdin io.Reader) ([]byte, error) {
@@ -182,7 +190,26 @@ func decodeInput(engine *vipswasm.Engine, path string, input []byte, opts option
 
 func shouldUseLibvipsInput(path string) bool {
 	switch strings.ToLower(filepath.Ext(path)) {
-	case ".avif", ".heic", ".heif":
+	case ".avif", ".cr2", ".csv", ".dng", ".exr", ".fit", ".fits", ".fts",
+		".gif", ".heic", ".heif", ".hdr", ".j2c", ".j2k", ".jp2", ".jxl",
+		".mat", ".nii", ".orf", ".pbm", ".pdf", ".pfm", ".pgm", ".pnm",
+		".ppm", ".rad", ".rw2", ".svg", ".tif", ".tiff", ".uhdr", ".v",
+		".vips", ".webp":
+		return true
+	default:
+		return false
+	}
+}
+
+func shouldUseFullCore(inputPath, outputFormat string) bool {
+	switch strings.ToLower(filepath.Ext(inputPath)) {
+	case ".cr2", ".dng", ".exr", ".fts", ".fit", ".fits", ".mat", ".nii",
+		".orf", ".rw2", ".svg":
+		return true
+	}
+	switch normalizeFormat(outputFormat) {
+	case "csv", "dz", "fit", "fits", "gif", "mat", "matrix", "nii", "nifti",
+		"raw", "uhdr":
 		return true
 	default:
 		return false
@@ -230,36 +257,55 @@ func writeFileAtomic(path string, data []byte, perm os.FileMode) error {
 }
 
 func outputFormat(path, explicit string) (string, error) {
-	format := strings.ToLower(strings.TrimPrefix(explicit, "."))
+	format := normalizeFormat(explicit)
 	if format == "" {
-		switch strings.ToLower(filepath.Ext(path)) {
-		case ".jpg", ".jpeg":
-			format = "jpeg"
-		case ".png":
-			format = "png"
-		}
+		format = normalizeFormat(filepath.Ext(path))
 	}
 	if format == "" && path == "-" {
 		return "", fmt.Errorf("-format is required when output is -")
 	}
-	switch format {
-	case "jpg":
-		return "jpeg", nil
-	case "jpeg", "png":
+	if isOutputFormat(format) {
 		return format, nil
-	default:
-		return "", fmt.Errorf("unsupported output format %q", format)
 	}
+	return "", fmt.Errorf("unsupported output format %q", format)
 }
 
-func encodeOutput(img *vipswasm.Image, out io.Writer, format string, quality int) error {
+func encodeOutput(engine *vipswasm.Engine, img *vipswasm.Image, out io.Writer, format string, quality int) error {
 	switch format {
 	case "png":
 		return img.EncodePNG(out)
 	case "jpeg":
 		return img.EncodeJPEG(out, &vipswasm.JPEGOptions{Quality: quality})
 	default:
-		return fmt.Errorf("unsupported output format %q", format)
+		encoded, err := engine.EncodeImage(img, format, &vipswasm.EncodeOptions{Quality: quality})
+		if err != nil {
+			return err
+		}
+		_, err = out.Write(encoded)
+		return err
+	}
+}
+
+func normalizeFormat(format string) string {
+	format = strings.ToLower(strings.TrimSpace(strings.TrimPrefix(format, ".")))
+	switch format {
+	case "jpg":
+		return "jpeg"
+	case "tif":
+		return "tiff"
+	case "j2c", "j2k":
+		return "jp2"
+	default:
+		return format
+	}
+}
+
+func isOutputFormat(format string) bool {
+	switch format {
+	case "jpeg", "png":
+		return true
+	default:
+		return false
 	}
 }
 

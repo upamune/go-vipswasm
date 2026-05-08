@@ -122,6 +122,14 @@ func TestDecodeAndEncodePNG(t *testing.T) {
 	if generic.Width != 2 || generic.Height != 1 {
 		t.Fatalf("Engine.DecodeImage() size = %dx%d, want 2x1", generic.Width, generic.Height)
 	}
+
+	encodedPNG, err := e.EncodeImage(img, "png", nil)
+	if err != nil {
+		t.Fatalf("Engine.EncodeImage(png) error = %v", err)
+	}
+	if len(encodedPNG) < 8 || string(encodedPNG[:8]) != "\x89PNG\r\n\x1a\n" {
+		t.Fatalf("Engine.EncodeImage(png) did not return PNG")
+	}
 }
 
 func TestGeneratedOperationCatalogCoversForeignCodecs(t *testing.T) {
@@ -136,6 +144,16 @@ func TestGeneratedOperationCatalogCoversForeignCodecs(t *testing.T) {
 		"pngsave":      "foreign",
 		"heifload":     "foreign",
 		"heifsave":     "foreign",
+		"webpload":     "foreign",
+		"webpsave":     "foreign",
+		"tiffload":     "foreign",
+		"tiffsave":     "foreign",
+		"gifload":      "foreign",
+		"gifsave":      "foreign",
+		"jxlload":      "foreign",
+		"jxlsave":      "foreign",
+		"jp2kload":     "foreign",
+		"jp2ksave":     "foreign",
 	}
 	got := make(map[string]VipsOperation, len(GeneratedOperations))
 	for _, op := range GeneratedOperations {

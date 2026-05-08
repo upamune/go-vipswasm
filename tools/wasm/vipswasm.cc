@@ -217,6 +217,64 @@ int32_t vipswasm_load_rgba(const uint8_t* src, uint32_t src_len,
 #endif
 }
 
+WASM_EXPORT(vipswasm_save_rgba)
+int32_t vipswasm_save_rgba(const uint8_t* src, uint32_t src_width,
+                           uint32_t src_height, const char* suffix,
+                           uint32_t suffix_len, uint8_t** dst,
+                           uint32_t* dst_len) {
+  if (src == nullptr || src_width == 0 || src_height == 0 ||
+      suffix == nullptr || suffix_len == 0 || dst == nullptr ||
+      dst_len == nullptr) {
+    return -1;
+  }
+  *dst = nullptr;
+  *dst_len = 0;
+
+#ifdef VIPSWASM_USE_LIBVIPS
+  if (!vipswasm::ensure_vips()) {
+    return -1;
+  }
+  const uint64_t pixel_len = static_cast<uint64_t>(src_width) * src_height * 4;
+  if (pixel_len > SIZE_MAX) {
+    return -1;
+  }
+  VipsImage* in = vips_image_new_from_memory_copy(
+      src, static_cast<size_t>(pixel_len), src_width, src_height, 4,
+      VIPS_FORMAT_UCHAR);
+  if (in == nullptr) {
+    return -1;
+  }
+  VipsImage* srgb = nullptr;
+  if (vips_copy(in, &srgb, "interpretation", VIPS_INTERPRETATION_sRGB,
+                nullptr) != 0 ||
+      srgb == nullptr) {
+    g_object_unref(in);
+    return -1;
+  }
+  g_object_unref(in);
+
+  const std::string save_suffix(suffix, suffix_len);
+  void* encoded = nullptr;
+  size_t encoded_len = 0;
+  const int ret = vips_image_write_to_buffer(
+      srgb, save_suffix.c_str(), &encoded, &encoded_len, nullptr);
+  g_object_unref(srgb);
+  if (ret != 0 || encoded == nullptr || encoded_len == 0 ||
+      encoded_len > UINT32_MAX) {
+    if (encoded != nullptr) {
+      g_free(encoded);
+    }
+    return -1;
+  }
+
+  *dst = static_cast<uint8_t*>(encoded);
+  *dst_len = static_cast<uint32_t>(encoded_len);
+  return 0;
+#else
+  return -1;
+#endif
+}
+
 }
 
 extern "C" {

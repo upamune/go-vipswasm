@@ -455,6 +455,79 @@
       "source_file": "tools/wasm/vipswasm.h"
     },
     {
+      "name": "vipswasm_save_rgba",
+      "qual_name": "vipswasm_save_rgba",
+      "return_type": {
+        "name": "int32_t",
+        "kind": "primitive",
+        "qual_type": "int32_t"
+      },
+      "params": [
+        {
+          "name": "src",
+          "type": {
+            "name": "uint8_t",
+            "kind": "primitive",
+            "is_const": true,
+            "is_pointer": true,
+            "qual_type": "const uint8_t *"
+          }
+        },
+        {
+          "name": "src_width",
+          "type": {
+            "name": "uint32_t",
+            "kind": "primitive",
+            "qual_type": "uint32_t"
+          }
+        },
+        {
+          "name": "src_height",
+          "type": {
+            "name": "uint32_t",
+            "kind": "primitive",
+            "qual_type": "uint32_t"
+          }
+        },
+        {
+          "name": "suffix",
+          "type": {
+            "name": "char",
+            "kind": "string",
+            "is_const": true,
+            "qual_type": "const char *"
+          }
+        },
+        {
+          "name": "suffix_len",
+          "type": {
+            "name": "uint32_t",
+            "kind": "primitive",
+            "qual_type": "uint32_t"
+          }
+        },
+        {
+          "name": "dst",
+          "type": {
+            "name": "uint8_t *",
+            "kind": "handle",
+            "is_pointer": true,
+            "qual_type": "uint8_t **"
+          }
+        },
+        {
+          "name": "dst_len",
+          "type": {
+            "name": "uint32_t",
+            "kind": "primitive",
+            "is_pointer": true,
+            "qual_type": "uint32_t *"
+          }
+        }
+      ],
+      "source_file": "tools/wasm/vipswasm.h"
+    },
+    {
       "name": "vipswasm_version",
       "qual_name": "vipswasm_version",
       "return_type": {

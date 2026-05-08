@@ -68,6 +68,28 @@ func TestRunWritesPNGToStdout(t *testing.T) {
 	}
 }
 
+func TestRunWritesPNGFile(t *testing.T) {
+	dir := t.TempDir()
+	input := filepath.Join(dir, "input.png")
+	output := filepath.Join(dir, "output.png")
+	if err := os.WriteFile(input, testPNG(t), 0o644); err != nil {
+		t.Fatal(err)
+	}
+
+	var stdout, stderr bytes.Buffer
+	code := Run([]string{input, output}, &stdout, &stderr)
+	if code != 0 {
+		t.Fatalf("Run() = %d, stderr = %s", code, stderr.String())
+	}
+	got, err := os.ReadFile(output)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(got) < 8 || string(got[:8]) != "\x89PNG\r\n\x1a\n" {
+		t.Fatalf("output is not PNG: % x", got[:min(len(got), 8)])
+	}
+}
+
 func TestRunDecodesStdinWithLibvipsPNGLoader(t *testing.T) {
 	var stdout, stderr bytes.Buffer
 	code := run([]string{"-libvips-input", "-format", "png", "-", "-"}, bytes.NewReader(testPNG(t)), &stdout, &stderr)
@@ -95,7 +117,7 @@ func TestRunSupportsLegacyLibvipsPNGInputFlag(t *testing.T) {
 }
 
 func TestShouldUseLibvipsInput(t *testing.T) {
-	for _, path := range []string{"input.heic", "input.HEIF", "input.avif"} {
+	for _, path := range []string{"input.heic", "input.HEIF", "input.avif", "input.webp", "input.tiff", "input.gif", "input.jxl", "input.jp2"} {
 		if !shouldUseLibvipsInput(path) {
 			t.Fatalf("shouldUseLibvipsInput(%q) = false, want true", path)
 		}
@@ -111,6 +133,13 @@ func TestRunRejectsUnknownFormat(t *testing.T) {
 	if code != 2 {
 		t.Fatalf("Run() = %d, want 2", code)
 	}
+}
+
+func min(a, b int) int {
+	if a < b {
+		return a
+	}
+	return b
 }
 
 func TestRunRequiresFormatForStdout(t *testing.T) {

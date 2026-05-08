@@ -48,10 +48,11 @@ install_name_tool -add_rpath ~/.config/wasmify/bin/wasi-sdk/lib ~/.config/wasmif
 The embedded wasm artifact is linked against the static WASI libvips probe and
 the public image operations execute through libvips. The package also keeps a
 vipsgen-style `GeneratedOperations` catalog for the typed surface, including
-foreign JPEG/PNG operation entries. The byte-oriented `Decode`, `EncodePNG`,
-and `EncodeJPEG` helpers intentionally use Go's standard image packages at the
-package edge. `Engine.DecodePNG` additionally exercises libvips' PNG foreign
-loader inside the wasm runtime.
+foreign codec operation entries. The byte-oriented `Decode`, `EncodePNG`, and
+`EncodeJPEG` helpers intentionally use Go's standard image packages at the
+package edge. `Engine.DecodeImage` exercises libvips' foreign loaders inside
+the wasm runtime; `NewFull` selects the larger full-format core when a caller
+needs codecs that are not in the default artifact.
 
 The default checked-in runtime is `internal/vipswasm.wasm`. The repository also
 includes `internal/vipswasm_full.wasm`, built by `make wasm-libvips-full`, for
@@ -133,9 +134,10 @@ return thumb.EncodePNG(output)
 
 `examples/convert_cli` is a complete command-line example built on the public
 Go API. It reads PNG/JPEG input through `vipswasm.Decode` by default, uses the
-embedded libvips foreign loader for HEIC/HEIF/AVIF input, can force libvips
-decode with `-libvips-input`, applies `ExtractArea` before `ResizeNearest`, and
-writes PNG or JPEG output.
+embedded libvips foreign loader for non-standard input such as HEIC/HEIF/AVIF,
+WebP, TIFF, GIF, JPEG XL, JPEG 2000, PDF, SVG, and RAW, can force libvips decode
+with `-libvips-input`, applies `ExtractArea` before `ResizeNearest`, and writes
+PNG/JPEG output.
 
 ```sh
 go run ./examples/convert_cli input.png output.jpg
