@@ -15,12 +15,12 @@ jobs:
       id-token: write
       attestations: write
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@34e114876b0b11c390a56381ad16ebd13914f8d5 # v4.3.1
         with:
           # Upstream source is expected to be a git submodule of this repo.
           # If you vendor it differently, replace this with an explicit clone.
           submodules: recursive
-      - uses: cachix/install-nix-action@v31
+      - uses: cachix/install-nix-action@8aa03977d8d733052d78f4e008a241fd1dbf36b3 # v31.10.6
         with:
           github_access_token: ${{ secrets.GITHUB_TOKEN }}
       - name: Install wasmify
@@ -33,7 +33,7 @@ jobs:
       # the build change; the pinned wasi-sdk version (31.0) is in the key so
       # bumping the SDK version busts old caches automatically.
       - name: Cache wasmify state
-        uses: actions/cache@v4
+        uses: actions/cache@0057852bfaa89a56745cba8c7296529d2fc39830 # v4.3.0
         with:
           path: |
             .wasmify
@@ -51,11 +51,11 @@ jobs:
       - name: Production audit
         run: nix develop --command bash -lc 'make audit-production'
       - name: Attest
-        uses: actions/attest-build-provenance@v2
+        uses: actions/attest-build-provenance@e8998f949152b193b063cb0ec769d69d929409be # v2.4.0
         with:
           subject-path: 'internal/vipswasm.wasm'
       - name: Release
-        uses: softprops/action-gh-release@v2
+        uses: softprops/action-gh-release@3bb12739c298aeb8a4eeaf626c5b8d85266b0e65 # v2.6.2
         if: startsWith(github.ref, 'refs/tags/')
         with:
           files: internal/vipswasm.wasm

@@ -35,6 +35,8 @@
               pkgs.cmake
               pkgs.meson
               pkgs.ninja
+              pkgs.glib
+              pkgs.gettext
               pkgs.git
             ];
 
