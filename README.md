@@ -53,6 +53,9 @@ foreign codec operation entries. The byte-oriented `Decode`, `EncodePNG`, and
 package edge. `Engine.DecodeImage` exercises libvips' foreign loaders inside
 the wasm runtime; `NewFull` selects the larger full-format core when a caller
 needs codecs that are not in the default artifact.
+Foreign loaders are exposed through the generic `Engine.DecodeImage` entry
+point. Foreign savers remain catalog/build artifacts for now; public encoding
+and the CLI intentionally support PNG/JPEG output only.
 
 The default checked-in runtime is `internal/vipswasm.wasm`. The repository also
 includes `internal/vipswasm_full.wasm`, built by `make wasm-libvips-full`, for

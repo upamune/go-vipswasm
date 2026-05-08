@@ -130,6 +130,9 @@ func TestDecodeAndEncodePNG(t *testing.T) {
 	if len(encodedPNG) < 8 || string(encodedPNG[:8]) != "\x89PNG\r\n\x1a\n" {
 		t.Fatalf("Engine.EncodeImage(png) did not return PNG")
 	}
+	if _, err := e.EncodeImage(img, "webp", nil); !errors.Is(err, ErrUnsupportedFormat) {
+		t.Fatalf("Engine.EncodeImage(webp) error = %v, want ErrUnsupportedFormat", err)
+	}
 }
 
 func TestGeneratedOperationCatalogCoversForeignCodecs(t *testing.T) {
