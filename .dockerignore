@@ -1,0 +1,4 @@
+.wasmify
+.wasm-artifacts
+.cache
+.DS_Store

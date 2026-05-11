@@ -28,6 +28,7 @@ var (
 	ErrInvalidGeometry   = errors.New("vipswasm: invalid geometry")
 	ErrUnsupportedFormat = errors.New("vipswasm: unsupported image format")
 	ErrTooLarge          = errors.New("vipswasm: image is too large")
+	ErrWasmMemoryLimit   = errors.New("vipswasm: wasm memory limit exceeded")
 )
 
 // Version reports the libvips-compatible ABI version exposed by the wasm core.
@@ -63,6 +64,12 @@ type JPEGOptions struct {
 // EncodeOptions configures Engine.EncodeImage.
 type EncodeOptions struct {
 	Quality int
+}
+
+// DecodeOptions configures libvips/WASM image decode.
+type DecodeOptions struct {
+	ResizeWidth  int
+	ResizeHeight int
 }
 
 // VipsOperation describes a generated libvips operation entry exposed by this package.
@@ -365,6 +372,20 @@ func (e *Engine) DecodeImage(data []byte) (*Image, error) {
 	return e.decodeRGBA("vipswasm_load_rgba", data)
 }
 
+// DecodeImageWithOptions decodes image bytes through libvips, optionally resizing during decode.
+func (e *Engine) DecodeImageWithOptions(data []byte, opts *DecodeOptions) (*Image, error) {
+	if opts == nil || (opts.ResizeWidth == 0 && opts.ResizeHeight == 0) {
+		return e.DecodeImage(data)
+	}
+	if opts.ResizeWidth <= 0 || opts.ResizeHeight <= 0 {
+		return nil, ErrInvalidGeometry
+	}
+	if _, err := rgbaLen(opts.ResizeWidth, opts.ResizeHeight); err != nil {
+		return nil, err
+	}
+	return e.decodeRGBAThumbnail(data, opts.ResizeWidth, opts.ResizeHeight)
+}
+
 // DecodePNG decodes PNG bytes through the embedded libvips PNG loader.
 func (e *Engine) DecodePNG(data []byte) (*Image, error) {
 	return e.decodeRGBA("vipswasm_pngload_rgba", data)
@@ -397,7 +418,7 @@ func (e *Engine) decodeRGBA(export string, data []byte) (*Image, error) {
 
 	ret, err := fn.Call(e.ctx, uint64(srcPtr), uint64(len(data)), uint64(metaPtr), uint64(metaPtr+4), uint64(metaPtr+8), uint64(metaPtr+12))
 	if err != nil {
-		return nil, err
+		return nil, wrapWasmError(err)
 	}
 	if int32(ret[0]) != 0 {
 		return nil, ErrInvalidImage
@@ -419,6 +440,63 @@ func (e *Engine) decodeRGBA(export string, data []byte) (*Image, error) {
 		return nil, errors.New("vipswasm: failed to read PNG decode output")
 	}
 	return &Image{Pix: append([]byte(nil), pix...), Width: width, Height: height}, nil
+}
+
+func (e *Engine) decodeRGBAThumbnail(data []byte, width, height int) (*Image, error) {
+	if len(data) == 0 {
+		return nil, ErrInvalidImage
+	}
+	e.mu.Lock()
+	if e.closed {
+		e.mu.Unlock()
+		return nil, ErrClosed
+	}
+	fn := e.module.ExportedFunction("vipswasm_load_thumbnail_rgba")
+	if fn == nil {
+		e.mu.Unlock()
+		// Older embedded cores do not have the decode-time thumbnail export. Keep
+		// the public API usable by falling back to decode + pure-Go nearest resize.
+		img, err := e.DecodeImage(data)
+		if err != nil {
+			return nil, err
+		}
+		return ResizeNearestGo(img, width, height)
+	}
+	defer e.mu.Unlock()
+	srcPtr, err := e.allocBytes(data)
+	if err != nil {
+		return nil, err
+	}
+	defer e.freePtr(srcPtr)
+	metaPtr, err := e.allocBytes(make([]byte, 16))
+	if err != nil {
+		return nil, err
+	}
+	defer e.freePtr(metaPtr)
+	ret, err := fn.Call(e.ctx, uint64(srcPtr), uint64(len(data)), uint64(width), uint64(height), uint64(metaPtr), uint64(metaPtr+4), uint64(metaPtr+8), uint64(metaPtr+12))
+	if err != nil {
+		return nil, wrapWasmError(err)
+	}
+	if int32(ret[0]) != 0 {
+		return nil, ErrInvalidImage
+	}
+	meta, ok := e.module.Memory().Read(metaPtr, 16)
+	if !ok {
+		return nil, errors.New("vipswasm: failed to read thumbnail decode metadata")
+	}
+	outPtr := binary.LittleEndian.Uint32(meta[0:4])
+	outLen := binary.LittleEndian.Uint32(meta[4:8])
+	outW := int(binary.LittleEndian.Uint32(meta[8:12]))
+	outH := int(binary.LittleEndian.Uint32(meta[12:16]))
+	defer e.freePtr(outPtr)
+	if want, err := rgbaLen(outW, outH); err != nil || want != int(outLen) {
+		return nil, ErrInvalidImage
+	}
+	pix, ok := e.module.Memory().Read(outPtr, outLen)
+	if !ok {
+		return nil, errors.New("vipswasm: failed to read thumbnail decode output")
+	}
+	return &Image{Pix: append([]byte(nil), pix...), Width: outW, Height: outH}, nil
 }
 
 // EncodeImage encodes an image in the requested format. PNG and JPEG use the
@@ -597,6 +675,29 @@ func (e *Engine) ResizeNearest(img *Image, width, height int) (*Image, error) {
 	return e.imageOp("w_0_1", width, height, req)
 }
 
+// ResizeNearestGo resizes an image with nearest-neighbor sampling in pure Go.
+func ResizeNearestGo(img *Image, width, height int) (*Image, error) {
+	if err := img.validate(); err != nil {
+		return nil, err
+	}
+	if width <= 0 || height <= 0 {
+		return nil, ErrInvalidGeometry
+	}
+	outLen, err := rgbaLen(width, height)
+	if err != nil {
+		return nil, err
+	}
+	out := make([]byte, outLen)
+	for y := 0; y < height; y++ {
+		sy := y * img.Height / height
+		for x := 0; x < width; x++ {
+			sx := x * img.Width / width
+			copy(out[(y*width+x)*4:], img.Pix[(sy*img.Width+sx)*4:(sy*img.Width+sx+1)*4])
+		}
+	}
+	return &Image{Pix: out, Width: width, Height: height}, nil
+}
+
 // ExtractArea crops an image in WebAssembly.
 func (e *Engine) ExtractArea(img *Image, left, top, width, height int) (*Image, error) {
 	if err := img.validate(); err != nil {
@@ -651,7 +752,7 @@ func (e *Engine) invokeWasmify(name string, req []byte) ([]byte, error) {
 	defer e.freePtr(reqPtr)
 	out, err := fn.Call(e.ctx, uint64(reqPtr), uint64(len(req)))
 	if err != nil {
-		return nil, err
+		return nil, wrapWasmError(err)
 	}
 	packed := out[0]
 	respPtr := uint32(packed >> 32)
@@ -670,7 +771,7 @@ func (e *Engine) invokeWasmify(name string, req []byte) ([]byte, error) {
 func (e *Engine) allocBytes(data []byte) (uint32, error) {
 	out, err := e.alloc.Call(e.ctx, uint64(len(data)))
 	if err != nil {
-		return 0, err
+		return 0, wrapWasmError(err)
 	}
 	ptr := uint32(out[0])
 	if ptr == 0 && len(data) != 0 {
@@ -685,6 +786,16 @@ func (e *Engine) allocBytes(data []byte) (uint32, error) {
 
 func (e *Engine) freePtr(ptr uint32) {
 	_, _ = e.free.Call(e.ctx, uint64(ptr))
+}
+
+func wrapWasmError(err error) error {
+	if err == nil {
+		return nil
+	}
+	if strings.Contains(strings.ToLower(err.Error()), "out of bounds memory access") {
+		return fmt.Errorf("%w: %v", ErrWasmMemoryLimit, err)
+	}
+	return err
 }
 
 func (img *Image) validate() error {

@@ -1,0 +1,44 @@
+# syntax=docker/dockerfile:1.7
+
+# Debian/FHS builder for regenerating the embedded WASI libvips core.
+# wasmify downloads upstream wasi-sdk Linux binaries, so a normal Debian userspace
+# is less fragile than a pure NixOS image here.
+FROM golang:1.25-bookworm AS builder
+
+ENV WASMIFY_NON_INTERACTIVE=1 \
+    PATH=/go/bin:/root/go/bin:/usr/local/go/bin:/usr/local/bin:/usr/local/sbin:/usr/sbin:/usr/bin:/sbin:/bin
+
+RUN apt-get update && \
+    apt-get install -y --no-install-recommends \
+      ca-certificates \
+      curl \
+      git \
+      xz-utils \
+      build-essential \
+      cmake \
+      ninja-build \
+      pkg-config \
+      python3 \
+      python3-pip \
+      libstdc++6 \
+      libncurses6 \
+      libglib2.0-dev \
+      binaryen && \
+    python3 -m pip install --break-system-packages --no-cache-dir 'meson>=1.4.0' && \
+    rm -rf /var/lib/apt/lists/*
+
+WORKDIR /src
+COPY . .
+
+RUN --mount=type=cache,target=/root/.cache/go-build \
+    --mount=type=cache,target=/go/pkg/mod \
+    make tools && \
+    make wasi-sdk && \
+    make wasm
+
+RUN mkdir -p /out/internal && \
+    cp internal/vipswasm.wasm /out/internal/vipswasm.wasm && \
+    test -s /out/internal/vipswasm.wasm
+
+FROM scratch AS artifact
+COPY --from=builder /out/ /

@@ -1,5 +1,6 @@
 .direnv/
 .wasmify/
+.wasm-artifacts/
 result
 dist/
 coverage.out

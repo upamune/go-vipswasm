@@ -150,8 +150,8 @@ func convert(ctx context.Context, inputPath, outputPath string, opts options, st
 			return err
 		}
 	}
-	if opts.resize.set {
-		img, err = engine.ResizeNearest(img, opts.resize.width, opts.resize.height)
+	if opts.resize.set && (!usesLibvipsInput(inputPath, opts) || opts.extract.set) {
+		img, err = resizeNearest(engine, img, opts.resize.width, opts.resize.height)
 		if err != nil {
 			return err
 		}
@@ -179,7 +179,10 @@ func readInput(path string, stdin io.Reader) ([]byte, error) {
 }
 
 func decodeInput(engine *vipswasm.Engine, path string, input []byte, opts options) (*vipswasm.Image, error) {
-	if opts.libvipsInput || shouldUseLibvipsInput(path) {
+	if usesLibvipsInput(path, opts) {
+		if opts.resize.set && !opts.extract.set {
+			return engine.DecodeImageWithOptions(input, &vipswasm.DecodeOptions{ResizeWidth: opts.resize.width, ResizeHeight: opts.resize.height})
+		}
 		return engine.DecodeImage(input)
 	}
 	if opts.libvipsPNGIn {
@@ -187,6 +190,10 @@ func decodeInput(engine *vipswasm.Engine, path string, input []byte, opts option
 	}
 	img, _, err := vipswasm.Decode(bytes.NewReader(input))
 	return img, err
+}
+
+func usesLibvipsInput(path string, opts options) bool {
+	return opts.libvipsInput || shouldUseLibvipsInput(path)
 }
 
 func shouldUseLibvipsInput(path string) bool {
@@ -213,6 +220,22 @@ func shouldUseFullCore(inputPath, outputFormat string) bool {
 	default:
 		return false
 	}
+}
+
+func resizeNearest(engine *vipswasm.Engine, img *vipswasm.Image, width, height int) (*vipswasm.Image, error) {
+	resized, err := engine.ResizeNearest(img, width, height)
+	if err == nil {
+		return resized, nil
+	}
+	fallback, fallbackErr := resizeNearestGo(img, width, height)
+	if fallbackErr != nil {
+		return nil, err
+	}
+	return fallback, nil
+}
+
+func resizeNearestGo(img *vipswasm.Image, width, height int) (*vipswasm.Image, error) {
+	return vipswasm.ResizeNearestGo(img, width, height)
 }
 
 func writeOutput(path string, data []byte, stdout io.Writer) error {

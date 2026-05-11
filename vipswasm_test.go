@@ -72,6 +72,38 @@ func TestResizeNearest(t *testing.T) {
 	assertRGBA(t, out, 2, 2, color.RGBA{R: 255, G: 255, A: 255})
 }
 
+func TestResizeNearestGo(t *testing.T) {
+	src := image.NewRGBA(image.Rect(0, 0, 2, 2))
+	src.SetRGBA(0, 0, color.RGBA{R: 255, A: 255})
+	src.SetRGBA(1, 0, color.RGBA{G: 255, A: 255})
+	src.SetRGBA(0, 1, color.RGBA{B: 255, A: 255})
+	src.SetRGBA(1, 1, color.RGBA{R: 255, G: 255, A: 255})
+	img, err := NewImageFromRGBA(src)
+	if err != nil {
+		t.Fatalf("NewImageFromRGBA() error = %v", err)
+	}
+
+	got, err := ResizeNearestGo(img, 4, 4)
+	if err != nil {
+		t.Fatalf("ResizeNearestGo() error = %v", err)
+	}
+	out, err := got.ToRGBA()
+	if err != nil {
+		t.Fatalf("ToRGBA() error = %v", err)
+	}
+	assertRGBA(t, out, 0, 0, color.RGBA{R: 255, A: 255})
+	assertRGBA(t, out, 2, 0, color.RGBA{G: 255, A: 255})
+	assertRGBA(t, out, 0, 2, color.RGBA{B: 255, A: 255})
+	assertRGBA(t, out, 2, 2, color.RGBA{R: 255, G: 255, A: 255})
+}
+
+func TestWrapWasmMemoryLimit(t *testing.T) {
+	err := wrapWasmError(errors.New("wasm error: out of bounds memory access"))
+	if !errors.Is(err, ErrWasmMemoryLimit) {
+		t.Fatalf("wrapWasmError() = %v, want ErrWasmMemoryLimit", err)
+	}
+}
+
 func TestExtractArea(t *testing.T) {
 	e := newTestEngine(t)
 	defer e.Close()
@@ -137,6 +169,14 @@ func TestDecodeAndEncodePNG(t *testing.T) {
 	}
 	if generic.Width != 2 || generic.Height != 1 {
 		t.Fatalf("Engine.DecodeImage() size = %dx%d, want 2x1", generic.Width, generic.Height)
+	}
+
+	thumb, err := e.DecodeImageWithOptions(encoded.Bytes(), &DecodeOptions{ResizeWidth: 1, ResizeHeight: 1})
+	if err != nil {
+		t.Fatalf("Engine.DecodeImageWithOptions() error = %v", err)
+	}
+	if thumb.Width != 1 || thumb.Height != 1 {
+		t.Fatalf("Engine.DecodeImageWithOptions() size = %dx%d, want 1x1", thumb.Width, thumb.Height)
 	}
 
 	encodedPNG, err := e.EncodeImage(img, "png", nil)
