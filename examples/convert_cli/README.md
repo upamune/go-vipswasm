@@ -51,15 +51,19 @@ docker run --rm \
 docker run --rm \
   --mount type=bind,src="$PWD",dst=/work \
   go-vipswasm-convert-cli:scratch \
-  input.heic output.png
+  /work/input.heic /work/output.png
 ```
 
-Use `-format` when writing to stdout:
+Use `-format` when writing to stdout. This is most useful for formats that Go's
+standard library can identify from the stream, such as PNG and JPEG:
 
 ```sh
 docker run --rm -i go-vipswasm-convert-cli:scratch \
-  -format png - - < input.heic > output.png
+  -format jpeg - - < input.png > output.jpg
 ```
+
+For non-standard inputs such as HEIC, prefer a file path instead of stdin so the
+CLI can select the embedded libvips decoder from the extension.
 
 ## Runtime notes
 
