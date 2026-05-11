@@ -36,6 +36,36 @@ If the pinned WASI SDK has not been installed yet:
 make wasi-sdk
 ```
 
+### Docker WASM build
+
+Use `Dockerfile.wasm` to regenerate `internal/vipswasm.wasm` without installing
+Meson, GLib tools, the WASI SDK, or other probe dependencies on the host:
+
+```sh
+# Build the artifact stage and export /out/ to .wasm-artifacts/.
+make docker-wasm
+
+# Replace the checked-in embedded artifact after reviewing the result.
+cp .wasm-artifacts/internal/vipswasm.wasm internal/vipswasm.wasm
+```
+
+Equivalent direct BuildKit command:
+
+```sh
+docker buildx build \
+  --progress=plain \
+  --file Dockerfile.wasm \
+  --target artifact \
+  --output type=local,dest=.wasm-artifacts \
+  .
+```
+
+The Docker build installs the host build tools needed by the libvips WASI probe,
+including `libglib2.0-dev` so tools such as `glib-mkenums` are available in
+`PATH`, then runs `make tools`, `make wasi-sdk`, and `make wasm` inside the
+container. The exported artifact is written to
+`.wasm-artifacts/internal/vipswasm.wasm`.
+
 On macOS, the current `wasi-sdk-31.0-arm64-macos` archive may contain an absolute `libedit` install name. If `clang++` fails to load `libedit.0.dylib`, repair the local SDK once:
 
 ```sh

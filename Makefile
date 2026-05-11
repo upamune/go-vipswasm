@@ -20,6 +20,10 @@ wasi-sdk: ## Install wasmify's pinned WASI SDK.
 .PHONY: wasm
 wasm: wasm-libvips-default ## Build the embedded WASI core linked against the default libvips WASI probe.
 
+.PHONY: docker-wasm
+docker-wasm: ## Build the embedded WASM artifact in Docker and export it under .wasm-artifacts/out/.
+	docker buildx build --progress=plain --file Dockerfile.wasm --target artifact --output type=local,dest=.wasm-artifacts .
+
 .PHONY: wasm-scaffold
 wasm-scaffold: ## Build the lightweight embedded WASI scaffold core.
 	$(WASI_CLANG) -O3 -fno-exceptions -mexec-model=reactor -I. -Itools/wasm \

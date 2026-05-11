@@ -10,6 +10,8 @@ import (
 	"path/filepath"
 	"strings"
 	"testing"
+
+	"github.com/upamune/go-vipswasm"
 )
 
 func TestRunConvertsAndResizesPNGToJPEG(t *testing.T) {
@@ -240,6 +242,36 @@ func TestRunDoesNotReplaceOutputOnConversionError(t *testing.T) {
 	}
 	if !bytes.Equal(got, original) {
 		t.Fatalf("output changed after failed conversion: %q", got)
+	}
+}
+
+func TestResizeNearestGoFallback(t *testing.T) {
+	img := image.NewRGBA(image.Rect(0, 0, 2, 2))
+	img.SetRGBA(0, 0, color.RGBA{R: 255, A: 255})
+	img.SetRGBA(1, 0, color.RGBA{G: 255, A: 255})
+	img.SetRGBA(0, 1, color.RGBA{B: 255, A: 255})
+	img.SetRGBA(1, 1, color.RGBA{R: 255, G: 255, A: 255})
+
+	src, err := vipswasm.NewImageFromRGBA(img)
+	if err != nil {
+		t.Fatal(err)
+	}
+	resized, err := resizeNearestGo(src, 4, 4)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if resized.Width != 4 || resized.Height != 4 {
+		t.Fatalf("resized size = %dx%d, want 4x4", resized.Width, resized.Height)
+	}
+	got, err := resized.ToRGBA()
+	if err != nil {
+		t.Fatal(err)
+	}
+	if got.RGBAAt(0, 0) != img.RGBAAt(0, 0) {
+		t.Fatalf("top-left pixel = %+v, want %+v", got.RGBAAt(0, 0), img.RGBAAt(0, 0))
+	}
+	if got.RGBAAt(3, 3) != img.RGBAAt(1, 1) {
+		t.Fatalf("bottom-right pixel = %+v, want %+v", got.RGBAAt(3, 3), img.RGBAAt(1, 1))
 	}
 }
 

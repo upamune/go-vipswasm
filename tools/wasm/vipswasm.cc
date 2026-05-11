@@ -217,6 +217,47 @@ int32_t vipswasm_load_rgba(const uint8_t* src, uint32_t src_len,
 #endif
 }
 
+WASM_EXPORT(vipswasm_load_thumbnail_rgba)
+int32_t vipswasm_load_thumbnail_rgba(const uint8_t* src, uint32_t src_len,
+                                     uint32_t thumb_width,
+                                     uint32_t thumb_height, uint8_t** dst,
+                                     uint32_t* dst_len, uint32_t* width,
+                                     uint32_t* height) {
+  if (src == nullptr || src_len == 0 || thumb_width == 0 ||
+      thumb_height == 0 || dst == nullptr || dst_len == nullptr ||
+      width == nullptr || height == nullptr) {
+    return -1;
+  }
+  *dst = nullptr;
+  *dst_len = 0;
+  *width = 0;
+  *height = 0;
+
+#ifdef VIPSWASM_USE_LIBVIPS
+  if (!vipswasm::ensure_vips()) {
+    return -1;
+  }
+  VipsImage* loaded = vips_image_new_from_buffer(src, src_len, "", nullptr);
+  if (loaded == nullptr) {
+    return -1;
+  }
+  const double xscale = static_cast<double>(thumb_width) / loaded->Xsize;
+  const double yscale = static_cast<double>(thumb_height) / loaded->Ysize;
+  const double scale = xscale < yscale ? xscale : yscale;
+  VipsImage* resized = nullptr;
+  if (vips_resize(loaded, &resized, scale, "vscale", scale,
+                  "kernel", VIPS_KERNEL_NEAREST, nullptr) != 0 ||
+      resized == nullptr) {
+    g_object_unref(loaded);
+    return -1;
+  }
+  g_object_unref(loaded);
+  return vipswasm::image_to_rgba(resized, dst, dst_len, width, height);
+#else
+  return -1;
+#endif
+}
+
 WASM_EXPORT(vipswasm_save_rgba)
 int32_t vipswasm_save_rgba(const uint8_t* src, uint32_t src_width,
                            uint32_t src_height, const char* suffix,
