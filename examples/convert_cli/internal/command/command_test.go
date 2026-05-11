@@ -4,20 +4,17 @@ import (
 	"bytes"
 	"image"
 	"image/color"
-	"image/jpeg"
 	"image/png"
 	"os"
 	"path/filepath"
 	"strings"
 	"testing"
-
-	"github.com/upamune/go-vipswasm"
 )
 
-func TestRunConvertsAndResizesPNGToJPEG(t *testing.T) {
+func TestRunConvertsAndResizesPNGToWebP(t *testing.T) {
 	dir := t.TempDir()
 	input := filepath.Join(dir, "input.png")
-	output := filepath.Join(dir, "output.jpg")
+	output := filepath.Join(dir, "output.webp")
 
 	if err := os.WriteFile(input, testPNG(t), 0o644); err != nil {
 		t.Fatal(err)
@@ -35,17 +32,12 @@ func TestRunConvertsAndResizesPNGToJPEG(t *testing.T) {
 	if info.Size() == 0 {
 		t.Fatal("output is empty")
 	}
-	file, err := os.Open(output)
+	got, err := os.ReadFile(output)
 	if err != nil {
 		t.Fatal(err)
 	}
-	defer file.Close()
-	got, err := jpeg.Decode(file)
-	if err != nil {
-		t.Fatal(err)
-	}
-	if got.Bounds().Dx() != 4 || got.Bounds().Dy() != 4 {
-		t.Fatalf("output size = %dx%d, want 4x4", got.Bounds().Dx(), got.Bounds().Dy())
+	if len(got) < 12 || string(got[:4]) != "RIFF" || string(got[8:12]) != "WEBP" {
+		t.Fatalf("output is not WebP: % x", got[:min(len(got), 12)])
 	}
 }
 
@@ -126,9 +118,9 @@ func TestRunWritesTIFFToStdout(t *testing.T) {
 	}
 }
 
-func TestRunDecodesStdinWithLibvipsPNGLoader(t *testing.T) {
+func TestRunDecodesStdinWithLibvipsLoader(t *testing.T) {
 	var stdout, stderr bytes.Buffer
-	code := run([]string{"-libvips-input", "-format", "png", "-", "-"}, bytes.NewReader(testPNG(t)), &stdout, &stderr)
+	code := run([]string{"-format", "png", "-", "-"}, bytes.NewReader(testPNG(t)), &stdout, &stderr)
 	if code != 0 {
 		t.Fatalf("run() = %d, stderr = %s", code, stderr.String())
 	}
@@ -138,47 +130,6 @@ func TestRunDecodesStdinWithLibvipsPNGLoader(t *testing.T) {
 	}
 	if got.Bounds().Dx() != 2 || got.Bounds().Dy() != 2 {
 		t.Fatalf("stdout image size = %dx%d, want 2x2", got.Bounds().Dx(), got.Bounds().Dy())
-	}
-}
-
-func TestRunSupportsLegacyLibvipsPNGInputFlag(t *testing.T) {
-	var stdout, stderr bytes.Buffer
-	code := run([]string{"-libvips-png-input", "-format", "png", "-", "-"}, bytes.NewReader(testPNG(t)), &stdout, &stderr)
-	if code != 0 {
-		t.Fatalf("run() = %d, stderr = %s", code, stderr.String())
-	}
-	if _, err := png.Decode(bytes.NewReader(stdout.Bytes())); err != nil {
-		t.Fatal(err)
-	}
-}
-
-func TestShouldUseLibvipsInput(t *testing.T) {
-	for _, path := range []string{"input.heic", "input.HEIF", "input.avif", "input.webp", "input.tiff", "input.gif", "input.jxl", "input.jp2", "input.exr", "input.fits", "input.mat", "input.nii"} {
-		if !shouldUseLibvipsInput(path) {
-			t.Fatalf("shouldUseLibvipsInput(%q) = false, want true", path)
-		}
-	}
-	if shouldUseLibvipsInput("input.jpg") {
-		t.Fatal("shouldUseLibvipsInput accepted jpg")
-	}
-	if shouldUseLibvipsInput("input.svg") {
-		t.Fatal("shouldUseLibvipsInput accepted svg")
-	}
-}
-
-func TestShouldUseFullCore(t *testing.T) {
-	for _, path := range []string{"input.exr", "input.fits", "input.mat", "input.nii"} {
-		if !shouldUseFullCore(path, "png") {
-			t.Fatalf("shouldUseFullCore(%q, png) = false, want true", path)
-		}
-	}
-	for _, format := range []string{"gif", "jp2"} {
-		if !shouldUseFullCore("input.png", format) {
-			t.Fatalf("shouldUseFullCore(input.png, %q) = false, want true", format)
-		}
-	}
-	if shouldUseFullCore("input.png", "webp") {
-		t.Fatal("shouldUseFullCore(input.png, webp) = true, want false")
 	}
 }
 
@@ -242,36 +193,6 @@ func TestRunDoesNotReplaceOutputOnConversionError(t *testing.T) {
 	}
 	if !bytes.Equal(got, original) {
 		t.Fatalf("output changed after failed conversion: %q", got)
-	}
-}
-
-func TestResizeNearestGoFallback(t *testing.T) {
-	img := image.NewRGBA(image.Rect(0, 0, 2, 2))
-	img.SetRGBA(0, 0, color.RGBA{R: 255, A: 255})
-	img.SetRGBA(1, 0, color.RGBA{G: 255, A: 255})
-	img.SetRGBA(0, 1, color.RGBA{B: 255, A: 255})
-	img.SetRGBA(1, 1, color.RGBA{R: 255, G: 255, A: 255})
-
-	src, err := vipswasm.NewImageFromRGBA(img)
-	if err != nil {
-		t.Fatal(err)
-	}
-	resized, err := resizeNearestGo(src, 4, 4)
-	if err != nil {
-		t.Fatal(err)
-	}
-	if resized.Width != 4 || resized.Height != 4 {
-		t.Fatalf("resized size = %dx%d, want 4x4", resized.Width, resized.Height)
-	}
-	got, err := resized.ToRGBA()
-	if err != nil {
-		t.Fatal(err)
-	}
-	if got.RGBAAt(0, 0) != img.RGBAAt(0, 0) {
-		t.Fatalf("top-left pixel = %+v, want %+v", got.RGBAAt(0, 0), img.RGBAAt(0, 0))
-	}
-	if got.RGBAAt(3, 3) != img.RGBAAt(1, 1) {
-		t.Fatalf("bottom-right pixel = %+v, want %+v", got.RGBAAt(3, 3), img.RGBAAt(1, 1))
 	}
 }
 

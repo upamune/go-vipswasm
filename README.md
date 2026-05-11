@@ -1,8 +1,14 @@
 # go-vipswasm
 
+<p align="center">
+  <img src="https://i.gyazo.com/23e9674eac498f92210f201639bf8301.png" alt="go-vipswasm logo" width="420">
+</p>
+
 `go-vipswasm` is a CGO-free Go package that runs an embedded libvips-backed WebAssembly image core through `wazero`.
 
 The package exposes runtime ownership, a typed operation catalog, and libvips-backed image operations (`ResizeNearest`, `ExtractArea`) behind a Go API. Public operations call the `wasmify` generated `w_0_*` bridge exports, and the wasm core is checked in as `internal/vipswasm.wasm`.
+
+`go-vipswasm` uses `github.com/goccy/wasmify` for API discovery and bridge generation: `api-spec.json`, `proto/vipswasm.proto`, `proto/wasmify/options.proto`, and `bridge/api_bridge.cc` are generated from `tools/wasm/vipswasm.h`. The final WASI module is linked by this repository's build scripts with wasmify's generated bridge, the project C++ shim, and statically built libvips/GLib/codec libraries. In other words, wasmify provides the Go-to-WASM bridge; the libvips WASI build and final static link are owned here.
 
 ## Development
 
@@ -19,9 +25,7 @@ make verify
 `WASMIFY_VERSION` from the Makefile. Override it only when intentionally
 upgrading the generated bridge.
 
-`make wasm` builds the default embedded artifact through the current libvips
-WASI probe. `make wasm-libvips-full` builds `internal/vipswasm_full.wasm`, a
-larger static WASI reactor with the extended libvips external-format preset.
+`make wasm` builds the full-format embedded artifact used by `New`.
 `make wasm-scaffold` is available only for the old lightweight RGBA scaffold
 build.
 
@@ -76,22 +80,34 @@ install_name_tool -add_rpath ~/.config/wasmify/bin/wasi-sdk/lib ~/.config/wasmif
 ## Status
 
 The embedded wasm artifact is linked against the static WASI libvips probe and
-the public image operations execute through libvips. The package also keeps a
+public image operations execute through libvips. The package also keeps a
 vipsgen-style `GeneratedOperations` catalog for the typed surface, including
-foreign codec operation entries. The byte-oriented `Decode`, `EncodePNG`, and
-`EncodeJPEG` helpers intentionally use Go's standard image packages at the
-package edge. `Engine.DecodeImage` exercises libvips' foreign loaders inside
-the wasm runtime; `NewFull` selects the larger full-format core when a caller
-needs codecs that are not in the default artifact.
-Foreign loaders are exposed through the generic `Engine.DecodeImage` entry
-point. Public encoding and the CLI support PNG/JPEG output plus the libvips
-foreign savers that run under the embedded WASI runtime today: WebP, TIFF, raw
-RGBA, GIF, and JPEG 2000.
+foreign codec operation entries. `Engine.DecodeImage`,
+`Engine.DecodeImageWithOptions`, `Engine.ResizeNearest`, `Engine.ExtractArea`,
+and `Engine.EncodeImage` run inside the wasm runtime. The package-level
+`Decode`, `Image.EncodePNG`, `Image.EncodeJPEG`, and `ResizeNearestGo` helpers
+remain for library callers, but the example CLI intentionally does not use them.
+`New` uses the full-format core; there is no separate default/full API split.
 
-The default checked-in runtime is `internal/vipswasm.wasm`. The repository also
-includes `internal/vipswasm_full.wasm`, built by `make wasm-libvips-full`, for
-validating the extended static WASI libvips dependency graph. The extended
-preset enables the static external packages that are both linkable and loadable
+### Format support matrix
+
+Use `SupportedFormats()` for the same matrix from Go code.
+
+- PNG: decode yes; encode yes; decode-time resize yes.
+- JPEG: decode yes; encode not exposed by the current embedded core; decode-time resize yes.
+- WebP: decode yes; encode yes; decode-time resize yes.
+- TIFF: decode yes; encode yes; decode-time resize yes.
+- GIF: decode yes; encode yes; decode-time resize yes.
+- JPEG 2000 (`jp2`): decode yes; encode yes.
+- HEIC/HEIF: decode yes through libheif; encode not exposed. For large HEIC/HEIF images, use `DecodeImageWithOptions` or `DecodeHEICWithOptions` with `ResizeWidth` and `ResizeHeight` so libvips can thumbnail during decode instead of allocating the full-resolution RGBA image.
+
+Foreign loaders are exposed through the generic `Engine.DecodeImage` entry
+point. Public `Engine.EncodeImage` uses the libvips foreign savers that run
+under the embedded WASI runtime today: PNG, WebP, TIFF, raw RGBA, GIF,
+and JPEG 2000. JPEG output is intentionally not listed until the embedded core exposes a working libvips JPEG saver.
+
+The checked-in runtime used by `New` is the full-format `internal/vipswasm.wasm`.
+The extended preset enables the static external packages that are both linkable and loadable
 under wazero today, including archive, CFITSIO, CGIF, EXIF, FFTW, HEIF/AVIF,
 highway, imagequant, JPEG XL, LCMS, ImageMagick, MATIO, NIfTI, OpenEXR,
 OpenJPEG, TIFF, and WebP. JPEG, UHDR, fontconfig/Pango/Cairo, OpenSlide,
@@ -102,19 +118,18 @@ runtime paths that do not load cleanly in wazero.
 The current WASI libvips probe is reproducible:
 
 ```sh
-direnv exec . make probe-reset
-direnv exec . make probe-glib-wasi
-direnv exec . make probe-libvips-wasi
-direnv exec . make probe-libvips-link-wasi
-direnv exec . make probe-libvips-run-wazero
-direnv exec . make probe-libvips-init-wazero
-direnv exec . make probe-libvips-gobject-wazero
-direnv exec . make probe-libvips-image-type-wazero
-direnv exec . make probe-libvips-image-new-wazero
-direnv exec . make probe-libvips-memory-wazero
-direnv exec . make probe-libvips-diagnose-wazero
-direnv exec . make wasm-libvips
-direnv exec . make wasm-libvips-full
+make probe-reset
+make probe-glib-wasi
+make probe-libvips-wasi
+make probe-libvips-link-wasi
+make probe-libvips-run-wazero
+make probe-libvips-init-wazero
+make probe-libvips-gobject-wazero
+make probe-libvips-image-type-wazero
+make probe-libvips-image-new-wazero
+make probe-libvips-memory-wazero
+make probe-libvips-diagnose-wazero
+make wasm-libvips
 ```
 
 `probe-glib-wasi` builds GLib/GObject/GIO as static WASI archives without
@@ -131,7 +146,7 @@ To check whether the repository has crossed from scaffold to the requested
 production libvips package, run:
 
 ```sh
-direnv exec . make audit-production
+make audit-production
 ```
 
 This target is the production gate for the current package surface.
@@ -147,50 +162,52 @@ GObject, VipsImage, and memory probe outputs to
 ## Example
 
 ```go
-engine, err := vipswasm.New(context.Background())
+engine, err := vipswasm.NewWithOptions(context.Background(), vipswasm.Options{
+    MaxInputBytes:   64 << 20,
+    MaxOutputPixels: 40_000_000,
+})
 if err != nil {
     return err
 }
 defer engine.Close()
 
-img, _, err := vipswasm.Decode(input)
+img, err := engine.DecodeImageWithOptions(inputBytes, &vipswasm.DecodeOptions{
+    ResizeWidth:  320,
+    ResizeHeight: 240,
+})
 if err != nil {
     return err
 }
-thumb, err := engine.ResizeNearest(img, 320, 240)
+encoded, err := engine.EncodeImage(img, "png", nil)
 if err != nil {
     return err
 }
-return thumb.EncodePNG(output)
+_, err = output.Write(encoded)
+return err
 ```
 
 ## CLI Example
 
 `examples/convert_cli` is a complete command-line example built on the public
-Go API. It reads PNG/JPEG input through `vipswasm.Decode` by default, uses the
-embedded libvips foreign loader for non-standard input such as HEIC/HEIF/AVIF,
-WebP, TIFF, GIF, JPEG XL, JPEG 2000, OpenEXR, FITS, MAT, and NIfTI, can force
-libvips decode with `-libvips-input`, applies `ExtractArea` before
-`ResizeNearest`, and writes PNG/JPEG/WebP/TIFF/raw/GIF/JPEG 2000 output.
+Go API. It decodes every input through the embedded libvips foreign loader,
+applies `ExtractArea` before `ResizeNearest` when cropping is requested, and
+writes PNG/WebP/TIFF/raw/GIF/JPEG 2000 output through `Engine.EncodeImage`.
+It does not use Go's standard image codecs or pure-Go resize fallbacks.
 
 ```sh
-go run ./examples/convert_cli input.png output.jpg
-go run ./examples/convert_cli input.heic output.jpg
+go run ./examples/convert_cli input.heic output.webp
 go run ./examples/convert_cli input.png output.webp
-go run ./examples/convert_cli input.heic output.jp2
 go run ./examples/convert_cli -resize 320x240 input.png thumb.png
-go run ./examples/convert_cli -extract 10,10,200,120 -format jpeg input.png - > crop.jpg
-cat input.heic | go run ./examples/convert_cli -libvips-input -format png - - > roundtrip.png
+go run ./examples/convert_cli -extract 10,10,200,120 -format webp input.png - > crop.webp
+cat input.heic | go run ./examples/convert_cli -resize 320x240 -format png - - > thumb.png
 ```
 
 Flags:
 
-- `-format png|jpeg|webp|tiff|raw|gif|jp2`: output format. This is required when output is `-`.
+- `-format png|webp|tiff|raw|gif|jp2`: output format. This is required when output is `-`.
 - `-resize WIDTHxHEIGHT`: resize with libvips nearest-neighbor sampling.
 - `-extract X,Y,WIDTH,HEIGHT`: crop before resizing.
-- `-quality 1..100`: JPEG/WebP quality, default `90`.
-- `-libvips-input`: decode input through the embedded libvips foreign loader.
-- `-libvips-png-input`: decode PNG input through the embedded libvips loader.
+- `-quality 1..100`: WebP quality, default `90`.
 
 File outputs are written atomically so a failed conversion does not replace an
 existing destination. Use `-` for stdin or stdout.

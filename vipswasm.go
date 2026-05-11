@@ -1,7 +1,6 @@
 package vipswasm
 
 import (
-	"bytes"
 	"context"
 	"encoding/binary"
 	"errors"
@@ -45,8 +44,43 @@ type Engine struct {
 	module  api.Module
 	alloc   api.Function
 	free    api.Function
+	options Options
 	mu      sync.Mutex
 	closed  bool
+}
+
+// Options configures Engine construction and policy limits. Zero values preserve
+// the historical behavior: wazero's default memory limit and no package-level
+// input or output-pixel preflight limits beyond integer overflow checks.
+type Options struct {
+	MemoryLimitPages uint32
+	MemoryLimitBytes uint64
+	MaxInputBytes    int
+	MaxOutputPixels  int
+}
+
+// FormatSupport reports decode/encode availability for a format in the embedded full-format core.
+type FormatSupport struct {
+	Format           string
+	Decode           bool
+	Encode           bool
+	DecodeTimeResize bool
+	Notes            string
+}
+
+// SupportedFormats returns the documented libvips/WASM format support matrix for the full embedded core.
+func SupportedFormats() []FormatSupport {
+	formats := []FormatSupport{
+		{"png", true, true, true, "libvips PNG loader/saver"},
+		{"jpeg", true, false, true, "decode through libvips; JPEG save is not exposed by the current embedded core"},
+		{"webp", true, true, true, "libvips WebP loader/saver"},
+		{"tiff", true, true, true, "libvips TIFF loader/saver"},
+		{"gif", true, true, true, "libvips GIF loader/saver"},
+		{"jp2", true, true, true, "JPEG 2000 via libvips loaders/savers"},
+		{"heic", true, false, true, "HEIC/HEIF decode through libheif; use DecodeImageWithOptions/DecodeHEICWithOptions for large images"},
+		{"heif", true, false, true, "alias of HEIC/HEIF decode support"},
+	}
+	return append([]FormatSupport(nil), formats...)
 }
 
 // Image stores tightly packed RGBA pixels.
@@ -226,18 +260,23 @@ var GeneratedOperations = []VipsOperation{
 	},
 }
 
-// New starts an Engine backed by the embedded WebAssembly core.
+// New starts an Engine backed by the full-format embedded WebAssembly core.
 func New(ctx context.Context) (*Engine, error) {
-	return NewWithWasm(ctx, internal.Wasm)
+	return NewWithOptions(ctx, Options{})
 }
 
-// NewFull starts an Engine backed by the larger full-format WebAssembly core.
-func NewFull(ctx context.Context) (*Engine, error) {
-	return NewWithWasm(ctx, internal.FullWasm)
+// NewWithOptions starts an Engine backed by the full-format embedded WebAssembly core and options.
+func NewWithOptions(ctx context.Context, opts Options) (*Engine, error) {
+	return NewWithWasmOptions(ctx, internal.Wasm, opts)
 }
 
 // NewWithWasm starts an Engine backed by caller-supplied WebAssembly bytes.
 func NewWithWasm(ctx context.Context, wasm []byte) (*Engine, error) {
+	return NewWithWasmOptions(ctx, wasm, Options{})
+}
+
+// NewWithWasmOptions starts an Engine backed by caller-supplied WebAssembly bytes and options.
+func NewWithWasmOptions(ctx context.Context, wasm []byte, opts Options) (*Engine, error) {
 	if ctx == nil {
 		ctx = context.Background()
 	}
@@ -245,10 +284,20 @@ func NewWithWasm(ctx context.Context, wasm []byte) (*Engine, error) {
 		return nil, errors.New("vipswasm: empty wasm core")
 	}
 
-	rt := wazero.NewRuntime(ctx)
+	rc := wazero.NewRuntimeConfig()
+	if opts.MemoryLimitBytes != 0 {
+		pages := (opts.MemoryLimitBytes + 65535) / 65536
+		if pages > math.MaxUint32 {
+			return nil, ErrTooLarge
+		}
+		rc = rc.WithMemoryLimitPages(uint32(pages))
+	} else if opts.MemoryLimitPages != 0 {
+		rc = rc.WithMemoryLimitPages(opts.MemoryLimitPages)
+	}
+	rt := wazero.NewRuntimeWithConfig(ctx, rc)
 	if _, err := wasi_snapshot_preview1.Instantiate(ctx, rt); err != nil {
 		_ = rt.Close(ctx)
-		return nil, err
+		return nil, wrapWasmError(err)
 	}
 	if _, err := rt.NewHostModuleBuilder("env").
 		NewFunctionBuilder().WithFunc(func(context.Context, uint32) uint32 {
@@ -262,13 +311,13 @@ func NewWithWasm(ctx context.Context, wasm []byte) (*Engine, error) {
 	}).Export("__cxa_throw").
 		Instantiate(ctx); err != nil {
 		_ = rt.Close(ctx)
-		return nil, err
+		return nil, wrapWasmError(err)
 	}
 
 	mod, err := rt.Instantiate(ctx, wasm)
 	if err != nil {
 		_ = rt.Close(ctx)
-		return nil, err
+		return nil, wrapWasmError(err)
 	}
 
 	e := &Engine{
@@ -277,6 +326,7 @@ func NewWithWasm(ctx context.Context, wasm []byte) (*Engine, error) {
 		module:  mod,
 		alloc:   mod.ExportedFunction("wasm_alloc"),
 		free:    mod.ExportedFunction("wasm_free"),
+		options: opts,
 	}
 	if e.alloc == nil || e.free == nil {
 		_ = e.Close()
@@ -285,13 +335,13 @@ func NewWithWasm(ctx context.Context, wasm []byte) (*Engine, error) {
 	if init := mod.ExportedFunction("_initialize"); init != nil {
 		if _, err := init.Call(ctx); err != nil {
 			_ = e.Close()
-			return nil, err
+			return nil, wrapWasmError(err)
 		}
 	}
 	if init := mod.ExportedFunction("wasm_init"); init != nil {
 		if _, err := init.Call(ctx); err != nil {
 			_ = e.Close()
-			return nil, err
+			return nil, wrapWasmError(err)
 		}
 	}
 	return e, nil
@@ -369,11 +419,17 @@ func Decode(r io.Reader) (*Image, string, error) {
 
 // DecodeImage decodes image bytes through the embedded libvips foreign loader.
 func (e *Engine) DecodeImage(data []byte) (*Image, error) {
+	if err := e.checkInputSize(data); err != nil {
+		return nil, err
+	}
 	return e.decodeRGBA("vipswasm_load_rgba", data)
 }
 
 // DecodeImageWithOptions decodes image bytes through libvips, optionally resizing during decode.
 func (e *Engine) DecodeImageWithOptions(data []byte, opts *DecodeOptions) (*Image, error) {
+	if err := e.checkInputSize(data); err != nil {
+		return nil, err
+	}
 	if opts == nil || (opts.ResizeWidth == 0 && opts.ResizeHeight == 0) {
 		return e.DecodeImage(data)
 	}
@@ -383,11 +439,23 @@ func (e *Engine) DecodeImageWithOptions(data []byte, opts *DecodeOptions) (*Imag
 	if _, err := rgbaLen(opts.ResizeWidth, opts.ResizeHeight); err != nil {
 		return nil, err
 	}
+	if err := e.checkOutputPixels(opts.ResizeWidth, opts.ResizeHeight); err != nil {
+		return nil, err
+	}
 	return e.decodeRGBAThumbnail(data, opts.ResizeWidth, opts.ResizeHeight)
+}
+
+// DecodeHEICWithOptions decodes HEIC/HEIF bytes through the full libvips/WASM loader.
+// Pass resize dimensions for large phone/camera images to use libvips decode-time thumbnailing.
+func (e *Engine) DecodeHEICWithOptions(data []byte, opts *DecodeOptions) (*Image, error) {
+	return e.DecodeImageWithOptions(data, opts)
 }
 
 // DecodePNG decodes PNG bytes through the embedded libvips PNG loader.
 func (e *Engine) DecodePNG(data []byte) (*Image, error) {
+	if err := e.checkInputSize(data); err != nil {
+		return nil, err
+	}
 	return e.decodeRGBA("vipswasm_pngload_rgba", data)
 }
 
@@ -435,9 +503,12 @@ func (e *Engine) decodeRGBA(export string, data []byte) (*Image, error) {
 	if want, err := rgbaLen(width, height); err != nil || want != int(outLen) {
 		return nil, ErrInvalidImage
 	}
+	if err := e.checkOutputPixels(width, height); err != nil {
+		return nil, err
+	}
 	pix, ok := e.module.Memory().Read(outPtr, outLen)
 	if !ok {
-		return nil, errors.New("vipswasm: failed to read PNG decode output")
+		return nil, fmt.Errorf("%w: failed to read decode output", ErrWasmMemoryLimit)
 	}
 	return &Image{Pix: append([]byte(nil), pix...), Width: width, Height: height}, nil
 }
@@ -454,13 +525,7 @@ func (e *Engine) decodeRGBAThumbnail(data []byte, width, height int) (*Image, er
 	fn := e.module.ExportedFunction("vipswasm_load_thumbnail_rgba")
 	if fn == nil {
 		e.mu.Unlock()
-		// Older embedded cores do not have the decode-time thumbnail export. Keep
-		// the public API usable by falling back to decode + pure-Go nearest resize.
-		img, err := e.DecodeImage(data)
-		if err != nil {
-			return nil, err
-		}
-		return ResizeNearestGo(img, width, height)
+		return nil, errors.New("vipswasm: wasm core is missing vipswasm_load_thumbnail_rgba export")
 	}
 	defer e.mu.Unlock()
 	srcPtr, err := e.allocBytes(data)
@@ -492,38 +557,27 @@ func (e *Engine) decodeRGBAThumbnail(data []byte, width, height int) (*Image, er
 	if want, err := rgbaLen(outW, outH); err != nil || want != int(outLen) {
 		return nil, ErrInvalidImage
 	}
+	if err := e.checkOutputPixels(outW, outH); err != nil {
+		return nil, err
+	}
 	pix, ok := e.module.Memory().Read(outPtr, outLen)
 	if !ok {
-		return nil, errors.New("vipswasm: failed to read thumbnail decode output")
+		return nil, fmt.Errorf("%w: failed to read thumbnail decode output", ErrWasmMemoryLimit)
 	}
 	return &Image{Pix: append([]byte(nil), pix...), Width: outW, Height: outH}, nil
 }
 
-// EncodeImage encodes an image in the requested format. PNG and JPEG use the
-// same Go encoders as EncodePNG and EncodeJPEG.
+// EncodeImage encodes an image in the requested format through libvips/WASM.
 func (e *Engine) EncodeImage(img *Image, format string, opts *EncodeOptions) ([]byte, error) {
 	if err := img.validate(); err != nil {
 		return nil, err
 	}
+	if err := e.checkOutputPixels(img.Width, img.Height); err != nil {
+		return nil, err
+	}
 	format = normalizeFormat(format)
 	switch format {
-	case "png":
-		var out bytes.Buffer
-		if err := img.EncodePNG(&out); err != nil {
-			return nil, err
-		}
-		return out.Bytes(), nil
-	case "jpeg":
-		var out bytes.Buffer
-		quality := 0
-		if opts != nil {
-			quality = opts.Quality
-		}
-		if err := img.EncodeJPEG(&out, &JPEGOptions{Quality: quality}); err != nil {
-			return nil, err
-		}
-		return out.Bytes(), nil
-	case "gif", "jp2", "raw", "tiff", "webp":
+	case "gif", "jp2", "png", "raw", "tiff", "webp":
 		return e.encodeImageWithLibvips(img, format, opts)
 	default:
 		return nil, fmt.Errorf("%w: %s", ErrUnsupportedFormat, format)
@@ -561,7 +615,7 @@ func (e *Engine) encodeImageWithLibvips(img *Image, format string, opts *EncodeO
 	defer e.freePtr(metaPtr)
 	ret, err := fn.Call(e.ctx, uint64(srcPtr), uint64(img.Width), uint64(img.Height), uint64(suffixPtr), uint64(len(suffix)), uint64(metaPtr), uint64(metaPtr+4))
 	if err != nil {
-		return nil, err
+		return nil, wrapWasmError(err)
 	}
 	if int32(ret[0]) != 0 {
 		return nil, fmt.Errorf("vipswasm: failed to encode %s", format)
@@ -575,7 +629,7 @@ func (e *Engine) encodeImageWithLibvips(img *Image, format string, opts *EncodeO
 	defer e.freePtr(outPtr)
 	out, ok := e.module.Memory().Read(outPtr, outLen)
 	if !ok {
-		return nil, errors.New("vipswasm: failed to read encode output")
+		return nil, fmt.Errorf("%w: failed to read encode output", ErrWasmMemoryLimit)
 	}
 	return append([]byte(nil), out...), nil
 }
@@ -724,6 +778,9 @@ func (e *Engine) imageOp(name string, width, height int, req []byte) (*Image, er
 	if err != nil {
 		return nil, err
 	}
+	if err := e.checkOutputPixels(width, height); err != nil {
+		return nil, err
+	}
 	resp, err := e.invokeWasmify(name, req)
 	if err != nil {
 		return nil, err
@@ -775,13 +832,34 @@ func (e *Engine) allocBytes(data []byte) (uint32, error) {
 	}
 	ptr := uint32(out[0])
 	if ptr == 0 && len(data) != 0 {
-		return 0, errors.New("vipswasm: wasm allocation failed")
+		return 0, fmt.Errorf("%w: wasm allocation failed", ErrWasmMemoryLimit)
 	}
 	if len(data) > 0 && !e.module.Memory().Write(ptr, data) {
 		e.freePtr(ptr)
-		return 0, errors.New("vipswasm: failed to write wasm memory")
+		return 0, fmt.Errorf("%w: failed to write wasm memory", ErrWasmMemoryLimit)
 	}
 	return ptr, nil
+}
+
+func (e *Engine) checkInputSize(data []byte) error {
+	if e != nil && e.options.MaxInputBytes > 0 && len(data) > e.options.MaxInputBytes {
+		return fmt.Errorf("%w: input is %d bytes, limit is %d", ErrTooLarge, len(data), e.options.MaxInputBytes)
+	}
+	return nil
+}
+
+func (e *Engine) checkOutputPixels(width, height int) error {
+	if e == nil || e.options.MaxOutputPixels <= 0 {
+		return nil
+	}
+	if width <= 0 || height <= 0 || width > math.MaxInt/height {
+		return ErrTooLarge
+	}
+	pixels := width * height
+	if pixels > e.options.MaxOutputPixels {
+		return fmt.Errorf("%w: output is %d pixels, limit is %d", ErrTooLarge, pixels, e.options.MaxOutputPixels)
+	}
+	return nil
 }
 
 func (e *Engine) freePtr(ptr uint32) {
@@ -792,7 +870,8 @@ func wrapWasmError(err error) error {
 	if err == nil {
 		return nil
 	}
-	if strings.Contains(strings.ToLower(err.Error()), "out of bounds memory access") {
+	msg := strings.ToLower(err.Error())
+	if strings.Contains(msg, "out of bounds memory access") || strings.Contains(msg, "memory") && (strings.Contains(msg, "limit") || strings.Contains(msg, "grow") || strings.Contains(msg, "allocate") || strings.Contains(msg, "minimum")) {
 		return fmt.Errorf("%w: %v", ErrWasmMemoryLimit, err)
 	}
 	return err

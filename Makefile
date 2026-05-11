@@ -18,7 +18,7 @@ wasi-sdk: ## Install wasmify's pinned WASI SDK.
 	$(WASMIFY) install-sdk
 
 .PHONY: wasm
-wasm: wasm-libvips-default ## Build the embedded WASI core linked against the default libvips WASI probe.
+wasm: wasm-libvips ## Build the full-format embedded WASI core linked against the libvips WASI probe.
 
 .PHONY: docker-wasm
 docker-wasm: ## Build the embedded WASM artifact in Docker and export it under .wasm-artifacts/out/.
@@ -32,21 +32,10 @@ wasm-scaffold: ## Build the lightweight embedded WASI scaffold core.
 	$(WASM_OPT) internal/vipswasm.wasm -Oz --strip-debug --strip-producers -o internal/vipswasm.wasm
 
 .PHONY: wasm-libvips
-wasm-libvips: probe-libvips-wasi ## Build the embedded wasmify core linked against the libvips WASI probe.
-	tools/libvips/build-wasmify-core.sh
-
-.PHONY: wasm-libvips-default
-wasm-libvips-default: probe-libvips-default-wasi ## Build a practical default libvips WASI core artifact.
-	LIBVIPS_BUILD=.wasmify/libvips-default-probe/build \
-		VIPSWASM_CORE_BUILD_DIR=.wasmify/wasmify-core-default \
-		VIPSWASM_OUTPUT=internal/vipswasm.wasm \
-		tools/libvips/build-wasmify-core.sh
-
-.PHONY: wasm-libvips-full
-wasm-libvips-full: probe-libvips-full-wasi ## Build a full-feature libvips WASI core probe artifact.
+wasm-libvips: probe-libvips-full-wasi ## Build the full-format embedded wasmify core linked against the libvips WASI probe.
 	LIBVIPS_BUILD=.wasmify/libvips-full-probe/build \
 		VIPSWASM_CORE_BUILD_DIR=.wasmify/wasmify-core-full \
-		VIPSWASM_OUTPUT=internal/vipswasm_full.wasm \
+		VIPSWASM_OUTPUT=internal/vipswasm.wasm \
 		tools/libvips/build-wasmify-core.sh
 
 .PHONY: generate
@@ -57,12 +46,6 @@ generate: ## Regenerate wasmify API spec, proto, and bridge sources.
 .PHONY: probe-libvips-wasi
 probe-libvips-wasi: probe-expat-wasi probe-libpng-wasi probe-glib-wasi ## Probe a minimal libvips WASI cross build.
 	tools/libvips/probe-wasi.sh
-
-.PHONY: probe-libvips-default-wasi
-probe-libvips-default-wasi: probe-expat-wasi probe-libpng-wasi probe-libwebp-wasi probe-libtiff-wasi probe-libheif-wasi probe-glib-wasi ## Probe a practical default libvips WASI cross build.
-	VIPSWASM_LIBVIPS_PRESET=default \
-		LIBVIPS_PROBE_DIR=.wasmify/libvips-default-probe \
-		tools/libvips/probe-wasi.sh
 
 .PHONY: probe-libvips-full-wasi
 probe-libvips-full-wasi: probe-expat-wasi probe-libpng-wasi probe-libarchive-wasi probe-fftw-wasi probe-imagemagick-wasi probe-cfitsio-wasi probe-libimagequant-wasi probe-cgif-wasi probe-libexif-wasi probe-libjpeg-wasi probe-libuhdr-wasi probe-libwebp-wasi probe-libtiff-wasi probe-pango-wasi probe-librsvg-wasi probe-openslide-wasi probe-matio-wasi probe-nifti-wasi probe-lcms-wasi probe-openexr-wasi probe-libraw-wasi probe-highway-wasi probe-poppler-wasi probe-libjxl-wasi probe-libheif-wasi probe-glib-wasi ## Probe a full libvips WASI cross build.
