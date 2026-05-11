@@ -3,24 +3,24 @@
 This directory contains the reproducible probe for the real libvips path.
 
 ```sh
-direnv exec . make probe-reset
-direnv exec . make probe-iconv-wasi
-direnv exec . make probe-pcre2-wasi
-direnv exec . make probe-zlib-wasi
-direnv exec . make probe-libpng-wasi
-direnv exec . make probe-expat-wasi
-direnv exec . make probe-glib-wasi
-direnv exec . make probe-glib-run-wazero
-direnv exec . make probe-libvips-wasi
-direnv exec . make probe-libvips-link-wasi
-direnv exec . make probe-libvips-run-wazero
-direnv exec . make probe-libvips-init-wazero
-direnv exec . make probe-libvips-gobject-wazero
-direnv exec . make probe-libvips-image-type-wazero
-direnv exec . make probe-libvips-image-new-wazero
-direnv exec . make probe-libvips-memory-wazero
-direnv exec . make probe-libvips-diagnose-wazero
-direnv exec . make wasm-libvips
+make probe-reset
+make probe-iconv-wasi
+make probe-pcre2-wasi
+make probe-zlib-wasi
+make probe-libpng-wasi
+make probe-expat-wasi
+make probe-glib-wasi
+make probe-glib-run-wazero
+make probe-libvips-wasi
+make probe-libvips-link-wasi
+make probe-libvips-run-wazero
+make probe-libvips-init-wazero
+make probe-libvips-gobject-wazero
+make probe-libvips-image-type-wazero
+make probe-libvips-image-new-wazero
+make probe-libvips-memory-wazero
+make probe-libvips-diagnose-wazero
+make wasm-libvips
 ```
 
 Use `make probe-reset` before a clean reproduction. The `.wasmify/` tree is a
@@ -49,7 +49,7 @@ under wazero without generic `ffi_call()`.
 The GLib-only reactor isolates GLib from libvips:
 
 ```text
-direnv exec . make probe-glib-run-wazero
+make probe-glib-run-wazero
 g_hash_table=1
 g_quark=1
 ```
@@ -64,36 +64,36 @@ The libvips link/run probes verify the static archive behind a tiny WASI
 reactor:
 
 ```text
-direnv exec . make probe-libvips-run-wazero
+make probe-libvips-run-wazero
 vips_version(0)=8
 ```
 
 ```text
-direnv exec . make probe-libvips-init-wazero
+make probe-libvips-init-wazero
 vips_version(0)=8
 vips_init()=0
 ```
 
 ```text
-direnv exec . make probe-libvips-gobject-wazero
+make probe-libvips-gobject-wazero
 vips_version(0)=8
 g_object_new(G_TYPE_OBJECT)=1
 ```
 
 ```text
-direnv exec . make probe-libvips-image-type-wazero
+make probe-libvips-image-type-wazero
 vips_version(0)=8
 VIPS_TYPE_IMAGE=1
 ```
 
 ```text
-direnv exec . make probe-libvips-image-new-wazero
+make probe-libvips-image-new-wazero
 vips_version(0)=8
 vips_image_new()=1
 ```
 
 ```text
-direnv exec . make probe-libvips-memory-wazero
+make probe-libvips-memory-wazero
 vips_version(0)=8
 vips_image_new_from_memory_copy width=1
 ```

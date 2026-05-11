@@ -102,19 +102,19 @@ runtime paths that do not load cleanly in wazero.
 The current WASI libvips probe is reproducible:
 
 ```sh
-direnv exec . make probe-reset
-direnv exec . make probe-glib-wasi
-direnv exec . make probe-libvips-wasi
-direnv exec . make probe-libvips-link-wasi
-direnv exec . make probe-libvips-run-wazero
-direnv exec . make probe-libvips-init-wazero
-direnv exec . make probe-libvips-gobject-wazero
-direnv exec . make probe-libvips-image-type-wazero
-direnv exec . make probe-libvips-image-new-wazero
-direnv exec . make probe-libvips-memory-wazero
-direnv exec . make probe-libvips-diagnose-wazero
-direnv exec . make wasm-libvips
-direnv exec . make wasm-libvips-full
+make probe-reset
+make probe-glib-wasi
+make probe-libvips-wasi
+make probe-libvips-link-wasi
+make probe-libvips-run-wazero
+make probe-libvips-init-wazero
+make probe-libvips-gobject-wazero
+make probe-libvips-image-type-wazero
+make probe-libvips-image-new-wazero
+make probe-libvips-memory-wazero
+make probe-libvips-diagnose-wazero
+make wasm-libvips
+make wasm-libvips-full
 ```
 
 `probe-glib-wasi` builds GLib/GObject/GIO as static WASI archives without
@@ -131,7 +131,7 @@ To check whether the repository has crossed from scaffold to the requested
 production libvips package, run:
 
 ```sh
-direnv exec . make audit-production
+make audit-production
 ```
 
 This target is the production gate for the current package surface.
