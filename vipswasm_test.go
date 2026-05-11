@@ -27,10 +27,10 @@ func TestEngineVersion(t *testing.T) {
 	}
 }
 
-func TestNewFullEngineVersion(t *testing.T) {
-	e, err := NewFull(context.Background())
+func TestNewEngineVersion(t *testing.T) {
+	e, err := New(context.Background())
 	if err != nil {
-		t.Fatalf("NewFull() error = %v", err)
+		t.Fatalf("New() error = %v", err)
 	}
 	defer e.Close()
 
@@ -98,9 +98,50 @@ func TestResizeNearestGo(t *testing.T) {
 }
 
 func TestWrapWasmMemoryLimit(t *testing.T) {
-	err := wrapWasmError(errors.New("wasm error: out of bounds memory access"))
-	if !errors.Is(err, ErrWasmMemoryLimit) {
-		t.Fatalf("wrapWasmError() = %v, want ErrWasmMemoryLimit", err)
+	for _, msg := range []string{
+		"wasm error: out of bounds memory access",
+		"memory grow failed: limit exceeded",
+		"memory minimum size exceeds limit",
+	} {
+		err := wrapWasmError(errors.New(msg))
+		if !errors.Is(err, ErrWasmMemoryLimit) {
+			t.Fatalf("wrapWasmError(%q) = %v, want ErrWasmMemoryLimit", msg, err)
+		}
+	}
+}
+
+func TestOptionsPolicyLimits(t *testing.T) {
+	e, err := NewWithOptions(context.Background(), Options{MaxInputBytes: 1, MaxOutputPixels: 1})
+	if err != nil {
+		t.Fatalf("NewWithOptions() error = %v", err)
+	}
+	defer e.Close()
+	if _, err := e.DecodeImage([]byte{1, 2}); !errors.Is(err, ErrTooLarge) {
+		t.Fatalf("DecodeImage over MaxInputBytes error = %v, want ErrTooLarge", err)
+	}
+	img, err := NewImageFromRawRGBA([]byte{0, 0, 0, 255}, 1, 1)
+	if err != nil {
+		t.Fatalf("NewImageFromRawRGBA() error = %v", err)
+	}
+	if _, err := e.ResizeNearest(img, 2, 1); !errors.Is(err, ErrTooLarge) {
+		t.Fatalf("ResizeNearest over MaxOutputPixels error = %v, want ErrTooLarge", err)
+	}
+}
+
+func TestSupportedFormatsIncludesHEIC(t *testing.T) {
+	var heic *FormatSupport
+	for _, fs := range SupportedFormats() {
+		fs := fs
+		if fs.Format == "heic" {
+			heic = &fs
+			break
+		}
+	}
+	if heic == nil {
+		t.Fatalf("SupportedFormats() missing heic")
+	}
+	if !heic.Decode || heic.Encode || !heic.DecodeTimeResize {
+		t.Fatalf("heic support = %+v, want decode-only support with decode-time resize", *heic)
 	}
 }
 
@@ -171,12 +212,18 @@ func TestDecodeAndEncodePNG(t *testing.T) {
 		t.Fatalf("Engine.DecodeImage() size = %dx%d, want 2x1", generic.Width, generic.Height)
 	}
 
-	thumb, err := e.DecodeImageWithOptions(encoded.Bytes(), &DecodeOptions{ResizeWidth: 1, ResizeHeight: 1})
-	if err != nil {
-		t.Fatalf("Engine.DecodeImageWithOptions() error = %v", err)
-	}
-	if thumb.Width != 1 || thumb.Height != 1 {
-		t.Fatalf("Engine.DecodeImageWithOptions() size = %dx%d, want 1x1", thumb.Width, thumb.Height)
+	if e.module.ExportedFunction("vipswasm_load_thumbnail_rgba") != nil {
+		thumb, err := e.DecodeImageWithOptions(encoded.Bytes(), &DecodeOptions{ResizeWidth: 1, ResizeHeight: 1})
+		if err != nil {
+			t.Fatalf("Engine.DecodeImageWithOptions() error = %v", err)
+		}
+		if thumb.Width != 1 || thumb.Height != 1 {
+			t.Fatalf("Engine.DecodeImageWithOptions() size = %dx%d, want 1x1", thumb.Width, thumb.Height)
+		}
+	} else {
+		if _, err := e.DecodeImageWithOptions(encoded.Bytes(), &DecodeOptions{ResizeWidth: 1, ResizeHeight: 1}); err == nil || !strings.Contains(err.Error(), "vipswasm_load_thumbnail_rgba") {
+			t.Fatalf("Engine.DecodeImageWithOptions() missing export error = %v, want missing thumbnail export", err)
+		}
 	}
 
 	encodedPNG, err := e.EncodeImage(img, "png", nil)
@@ -215,10 +262,10 @@ func TestDecodeAndEncodePNG(t *testing.T) {
 	}
 }
 
-func TestFullEncodeImageAdditionalLibvipsSavers(t *testing.T) {
-	e, err := NewFull(context.Background())
+func TestEncodeImageAdditionalLibvipsSavers(t *testing.T) {
+	e, err := New(context.Background())
 	if err != nil {
-		t.Fatalf("NewFull() error = %v", err)
+		t.Fatalf("New() error = %v", err)
 	}
 	defer e.Close()
 

@@ -40,7 +40,7 @@ The initial `VIPSWASM_LIBVIPS_PRESET=full` target was intended to enable:
 ## Status
 
 The `full` preset now configures, builds `libvips.a`, and links
-`internal/vipswasm_full.wasm` as a static WASI reactor.
+`internal/vipswasm.wasm` as a static WASI reactor.
 
 The resulting full Meson configuration enables the external packages that are
 both linkable and loadable under wazero today:

@@ -42,7 +42,7 @@ docker run --rm \
 docker run --rm \
   --mount type=bind,src=/tmp/go-vipswasm-out,dst=/out \
   go-vipswasm-convert-cli:scratch \
-  -resize 320x240 /tmp/shelf-christmas-decoration.heic /out/thumb.jpg
+  -resize 320x240 /tmp/shelf-christmas-decoration.heic /out/thumb.webp
 ```
 
 ## Use your own input
@@ -54,20 +54,17 @@ docker run --rm \
   /work/input.heic /work/output.png
 ```
 
-Use `-format` when writing to stdout. This is most useful for formats that Go's
-standard library can identify from the stream, such as PNG and JPEG:
+Use `-format` when writing to stdout because the output path cannot provide an
+extension:
 
 ```sh
 docker run --rm -i go-vipswasm-convert-cli:scratch \
-  -format jpeg - - < input.png > output.jpg
+  -format webp - - < input.png > output.webp
 ```
-
-For non-standard inputs such as HEIC, prefer a file path instead of stdin so the
-CLI can select the embedded libvips decoder from the extension.
 
 ## Runtime notes
 
-- PNG/JPEG edge encoding uses Go's standard library.
-- WebP, TIFF, GIF, JPEG 2000, and non-standard input decoders use the embedded libvips WASM runtime.
-- `-resize` first tries the libvips-backed WASM operation. If the WASM operation runs out of linear memory on a large decoded image, the CLI falls back to a Go nearest-neighbor resize so the conversion can still complete.
+- All decoding uses the embedded libvips WASM runtime.
+- PNG, WebP, TIFF, GIF, JPEG 2000, and raw RGBA outputs use `Engine.EncodeImage`. JPEG output is intentionally unsupported until the embedded core exposes a working libvips JPEG saver.
+- `-resize` uses the libvips-backed WASM operation.
 - The final image is `scratch`; `/bin/sh` intentionally does not exist.

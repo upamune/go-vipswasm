@@ -16,12 +16,10 @@ import (
 )
 
 type options struct {
-	format       string
-	resize       geometry
-	extract      area
-	quality      int
-	libvipsInput bool
-	libvipsPNGIn bool
+	format  string
+	resize  geometry
+	extract area
+	quality int
 }
 
 type geometry struct {
@@ -57,10 +55,8 @@ func run(args []string, stdin io.Reader, stdout, stderr io.Writer) int {
 	var opts options
 	resize := fs.String("resize", "", "resize to WIDTHxHEIGHT with libvips nearest-neighbor sampling")
 	extract := fs.String("extract", "", "crop X,Y,WIDTH,HEIGHT before resizing")
-	fs.StringVar(&opts.format, "format", "", "output format: png, jpeg, webp, tiff, raw, gif, or jp2")
-	fs.IntVar(&opts.quality, "quality", 90, "JPEG/WebP quality from 1 to 100")
-	fs.BoolVar(&opts.libvipsInput, "libvips-input", false, "decode input with the embedded libvips foreign loader")
-	fs.BoolVar(&opts.libvipsPNGIn, "libvips-png-input", false, "decode PNG input with the embedded libvips PNG loader")
+	fs.StringVar(&opts.format, "format", "", "output format: png, webp, tiff, raw, gif, or jp2")
+	fs.IntVar(&opts.quality, "quality", 90, "WebP quality from 1 to 100")
 
 	if err := fs.Parse(args); err != nil {
 		if errors.Is(err, flag.ErrHelp) {
@@ -109,18 +105,16 @@ func usage(w io.Writer) {
 	fmt.Fprintln(w, "usage: convert_cli [flags] <input> <output>")
 	fmt.Fprintln(w)
 	fmt.Fprintln(w, "flags:")
-	fmt.Fprintln(w, "  -format png|jpeg|webp|tiff|raw|gif|jp2")
+	fmt.Fprintln(w, "  -format png|webp|tiff|raw|gif|jp2")
 	fmt.Fprintln(w, "                            output format; required when output is -")
 	fmt.Fprintln(w, "  -resize WIDTHxHEIGHT      resize with libvips nearest-neighbor sampling")
 	fmt.Fprintln(w, "  -extract X,Y,WIDTH,HEIGHT crop before resizing")
-	fmt.Fprintln(w, "  -quality 1..100           JPEG/WebP quality, default 90")
-	fmt.Fprintln(w, "  -libvips-input            decode input with the embedded libvips foreign loader")
-	fmt.Fprintln(w, "  -libvips-png-input        decode PNG input with the embedded libvips loader")
+	fmt.Fprintln(w, "  -quality 1..100           WebP quality, default 90")
 	fmt.Fprintln(w)
 	fmt.Fprintln(w, "examples:")
-	fmt.Fprintln(w, "  convert_cli input.png output.jpg")
+	fmt.Fprintln(w, "  convert_cli input.png output.webp")
 	fmt.Fprintln(w, "  convert_cli -resize 320x240 input.png thumb.png")
-	fmt.Fprintln(w, "  convert_cli -extract 10,10,200,120 -format jpeg input.png - > out.jpg")
+	fmt.Fprintln(w, "  convert_cli -extract 10,10,200,120 -format webp input.png - > out.webp")
 }
 
 func convert(ctx context.Context, inputPath, outputPath string, opts options, stdin io.Reader, stdout io.Writer) error {
@@ -134,13 +128,13 @@ func convert(ctx context.Context, inputPath, outputPath string, opts options, st
 		return err
 	}
 
-	engine, err := newEngine(ctx, inputPath, format)
+	engine, err := newEngine(ctx)
 	if err != nil {
 		return err
 	}
 	defer engine.Close()
 
-	img, err := decodeInput(engine, inputPath, input, opts)
+	img, err := decodeInput(engine, input)
 	if err != nil {
 		return err
 	}
@@ -150,8 +144,8 @@ func convert(ctx context.Context, inputPath, outputPath string, opts options, st
 			return err
 		}
 	}
-	if opts.resize.set && (!usesLibvipsInput(inputPath, opts) || opts.extract.set) {
-		img, err = resizeNearest(engine, img, opts.resize.width, opts.resize.height)
+	if opts.resize.set {
+		img, err = engine.ResizeNearest(img, opts.resize.width, opts.resize.height)
 		if err != nil {
 			return err
 		}
@@ -164,10 +158,7 @@ func convert(ctx context.Context, inputPath, outputPath string, opts options, st
 	return writeOutput(outputPath, encoded.Bytes(), stdout)
 }
 
-func newEngine(ctx context.Context, inputPath, outputFormat string) (*vipswasm.Engine, error) {
-	if shouldUseFullCore(inputPath, outputFormat) {
-		return vipswasm.NewFull(ctx)
-	}
+func newEngine(ctx context.Context) (*vipswasm.Engine, error) {
 	return vipswasm.New(ctx)
 }
 
@@ -178,64 +169,8 @@ func readInput(path string, stdin io.Reader) ([]byte, error) {
 	return os.ReadFile(path)
 }
 
-func decodeInput(engine *vipswasm.Engine, path string, input []byte, opts options) (*vipswasm.Image, error) {
-	if usesLibvipsInput(path, opts) {
-		if opts.resize.set && !opts.extract.set {
-			return engine.DecodeImageWithOptions(input, &vipswasm.DecodeOptions{ResizeWidth: opts.resize.width, ResizeHeight: opts.resize.height})
-		}
-		return engine.DecodeImage(input)
-	}
-	if opts.libvipsPNGIn {
-		return engine.DecodePNG(input)
-	}
-	img, _, err := vipswasm.Decode(bytes.NewReader(input))
-	return img, err
-}
-
-func usesLibvipsInput(path string, opts options) bool {
-	return opts.libvipsInput || shouldUseLibvipsInput(path)
-}
-
-func shouldUseLibvipsInput(path string) bool {
-	switch strings.ToLower(filepath.Ext(path)) {
-	case ".avif", ".csv", ".exr", ".fit", ".fits", ".fts",
-		".gif", ".heic", ".heif", ".hdr", ".j2c", ".j2k", ".jp2", ".jxl",
-		".mat", ".nii", ".pbm", ".pfm", ".pgm", ".pnm",
-		".ppm", ".rad", ".tif", ".tiff", ".v",
-		".vips", ".webp":
-		return true
-	default:
-		return false
-	}
-}
-
-func shouldUseFullCore(inputPath, outputFormat string) bool {
-	switch strings.ToLower(filepath.Ext(inputPath)) {
-	case ".exr", ".fts", ".fit", ".fits", ".mat", ".nii":
-		return true
-	}
-	switch normalizeFormat(outputFormat) {
-	case "gif", "jp2":
-		return true
-	default:
-		return false
-	}
-}
-
-func resizeNearest(engine *vipswasm.Engine, img *vipswasm.Image, width, height int) (*vipswasm.Image, error) {
-	resized, err := engine.ResizeNearest(img, width, height)
-	if err == nil {
-		return resized, nil
-	}
-	fallback, fallbackErr := resizeNearestGo(img, width, height)
-	if fallbackErr != nil {
-		return nil, err
-	}
-	return fallback, nil
-}
-
-func resizeNearestGo(img *vipswasm.Image, width, height int) (*vipswasm.Image, error) {
-	return vipswasm.ResizeNearestGo(img, width, height)
+func decodeInput(engine *vipswasm.Engine, input []byte) (*vipswasm.Image, error) {
+	return engine.DecodeImage(input)
 }
 
 func writeOutput(path string, data []byte, stdout io.Writer) error {
@@ -293,19 +228,12 @@ func outputFormat(path, explicit string) (string, error) {
 }
 
 func encodeOutput(engine *vipswasm.Engine, img *vipswasm.Image, out io.Writer, format string, quality int) error {
-	switch format {
-	case "png":
-		return img.EncodePNG(out)
-	case "jpeg":
-		return img.EncodeJPEG(out, &vipswasm.JPEGOptions{Quality: quality})
-	default:
-		encoded, err := engine.EncodeImage(img, format, &vipswasm.EncodeOptions{Quality: quality})
-		if err != nil {
-			return err
-		}
-		_, err = out.Write(encoded)
+	encoded, err := engine.EncodeImage(img, format, &vipswasm.EncodeOptions{Quality: quality})
+	if err != nil {
 		return err
 	}
+	_, err = out.Write(encoded)
+	return err
 }
 
 func normalizeFormat(format string) string {
@@ -324,7 +252,7 @@ func normalizeFormat(format string) string {
 
 func isOutputFormat(format string) bool {
 	switch format {
-	case "gif", "jpeg", "jp2", "png", "raw", "tiff", "webp":
+	case "gif", "jp2", "png", "raw", "tiff", "webp":
 		return true
 	default:
 		return false
