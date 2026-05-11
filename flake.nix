@@ -42,6 +42,7 @@
             ];
 
             shellHook = ''
+              unset GOROOT
               export PATH="$HOME/go/bin:$PATH"
               export WASMIFY_NON_INTERACTIVE=1
             '';

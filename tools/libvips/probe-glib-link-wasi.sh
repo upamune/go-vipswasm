@@ -78,8 +78,15 @@ filter_link_flags() {
     grep -Ev '^-pthread$|^-Wl,--start-group$|^-Wl,--end-group$|^-Wl,--as-needed$|^-Wl,--no-as-needed$'
 }
 
-mapfile -t cflags < <(pkg-config --cflags glib-2.0 | filter_link_flags)
-mapfile -t libs < <(pkg-config --libs --static glib-2.0 | filter_link_flags)
+cflags=()
+while IFS= read -r flag; do
+  cflags+=("$flag")
+done < <(pkg-config --cflags glib-2.0 | filter_link_flags)
+
+libs=()
+while IFS= read -r flag; do
+  libs+=("$flag")
+done < <(pkg-config --libs --static glib-2.0 | filter_link_flags)
 
 "$WASI_SDK_PATH/bin/clang" \
   --target=wasm32-wasip1 \

@@ -120,6 +120,23 @@ func TestSupportedFormatsIncludesHEIC(t *testing.T) {
 	}
 }
 
+func TestSupportedFormatsIncludesJPEGEncode(t *testing.T) {
+	var jpeg *FormatSupport
+	for _, fs := range SupportedFormats() {
+		fs := fs
+		if fs.Format == "jpeg" {
+			jpeg = &fs
+			break
+		}
+	}
+	if jpeg == nil {
+		t.Fatalf("SupportedFormats() missing jpeg")
+	}
+	if !jpeg.Decode || !jpeg.Encode || !jpeg.DecodeTimeResize {
+		t.Fatalf("jpeg support = %+v, want decode and encode support with decode-time resize", *jpeg)
+	}
+}
+
 func TestExtractArea(t *testing.T) {
 	e := newTestEngine(t)
 	defer e.Close()
@@ -224,6 +241,21 @@ func TestLibvipsDecodeAndEncodePNG(t *testing.T) {
 		t.Fatalf("Engine.EncodeImage(webp) did not return WebP")
 	}
 
+	encodedJPEG, err := e.EncodeImage(img, "jpeg", &EncodeOptions{Quality: 90})
+	if err != nil {
+		t.Fatalf("Engine.EncodeImage(jpeg) error = %v", err)
+	}
+	if !isJPEG(encodedJPEG) {
+		t.Fatalf("Engine.EncodeImage(jpeg) did not return JPEG")
+	}
+	decodedJPEG, err := e.DecodeImage(encodedJPEG)
+	if err != nil {
+		t.Fatalf("Engine.DecodeImage(jpeg) error = %v", err)
+	}
+	if decodedJPEG.Width != img.Width || decodedJPEG.Height != img.Height {
+		t.Fatalf("Engine.DecodeImage(jpeg) size = %dx%d, want %dx%d", decodedJPEG.Width, decodedJPEG.Height, img.Width, img.Height)
+	}
+
 	encodedTIFF, err := e.EncodeImage(img, "tiff", nil)
 	if err != nil {
 		t.Fatalf("Engine.EncodeImage(tiff) error = %v", err)
@@ -234,6 +266,79 @@ func TestLibvipsDecodeAndEncodePNG(t *testing.T) {
 
 	if _, err := e.EncodeImage(img, "bmp", nil); !errors.Is(err, ErrUnsupportedFormat) {
 		t.Fatalf("Engine.EncodeImage(bmp) error = %v, want ErrUnsupportedFormat", err)
+	}
+}
+
+func TestMalformedJPEGDoesNotPoisonEngine(t *testing.T) {
+	e := newTestEngine(t)
+	defer e.Close()
+
+	malformedJPEG := []byte{
+		0xff, 0xd8,
+		0xff, 0xdb, 0x00, 0x43, 0x00,
+	}
+	if _, err := e.DecodeImage(malformedJPEG); err == nil {
+		t.Fatalf("Engine.DecodeImage(malformed jpeg) error = nil")
+	}
+
+	img, err := NewImageFromRawRGBA([]byte{
+		255, 0, 0, 255,
+		0, 255, 0, 255,
+		0, 0, 255, 255,
+		255, 255, 255, 255,
+	}, 2, 2)
+	if err != nil {
+		t.Fatalf("NewImageFromRawRGBA error = %v", err)
+	}
+	encoded, err := e.EncodeImage(img, "jpeg", &EncodeOptions{Quality: 85})
+	if err != nil {
+		t.Fatalf("Engine.EncodeImage(jpeg) after malformed decode error = %v", err)
+	}
+	if !isJPEG(encoded) {
+		t.Fatalf("Engine.EncodeImage(jpeg) after malformed decode did not return JPEG")
+	}
+	decoded, err := e.DecodeImage(encoded)
+	if err != nil {
+		t.Fatalf("Engine.DecodeImage(valid jpeg) after malformed decode error = %v", err)
+	}
+	if decoded.Width != img.Width || decoded.Height != img.Height {
+		t.Fatalf("Engine.DecodeImage(valid jpeg) after malformed decode size = %dx%d, want %dx%d", decoded.Width, decoded.Height, img.Width, img.Height)
+	}
+}
+
+func TestWasmTrapReinstantiatesEngine(t *testing.T) {
+	trappingWasm := []byte{
+		0x00, 0x61, 0x73, 0x6d, 0x01, 0x00, 0x00, 0x00,
+		0x01, 0x14, 0x03, 0x60, 0x01, 0x7f, 0x01, 0x7f, 0x60, 0x01, 0x7f, 0x00, 0x60, 0x06, 0x7f, 0x7f, 0x7f, 0x7f, 0x7f, 0x7f, 0x01, 0x7f,
+		0x03, 0x04, 0x03, 0x00, 0x01, 0x02,
+		0x05, 0x03, 0x01, 0x00, 0x01,
+		0x07, 0x38, 0x04,
+		0x06, 0x6d, 0x65, 0x6d, 0x6f, 0x72, 0x79, 0x02, 0x00,
+		0x0a, 0x77, 0x61, 0x73, 0x6d, 0x5f, 0x61, 0x6c, 0x6c, 0x6f, 0x63, 0x00, 0x00,
+		0x09, 0x77, 0x61, 0x73, 0x6d, 0x5f, 0x66, 0x72, 0x65, 0x65, 0x00, 0x01,
+		0x12, 0x76, 0x69, 0x70, 0x73, 0x77, 0x61, 0x73, 0x6d, 0x5f, 0x6c, 0x6f, 0x61, 0x64, 0x5f, 0x72, 0x67, 0x62, 0x61, 0x00, 0x02,
+		0x0a, 0x0e, 0x03, 0x05, 0x00, 0x41, 0x80, 0x08, 0x0b, 0x02, 0x00, 0x0b, 0x03, 0x00, 0x00, 0x0b,
+	}
+	e, err := NewWithWasm(context.Background(), trappingWasm)
+	if err != nil {
+		t.Fatalf("NewWithWasm(trapping) error = %v", err)
+	}
+	defer e.Close()
+
+	if _, err := e.DecodeImage([]byte{1}); err == nil {
+		t.Fatalf("Engine.DecodeImage(trapping wasm) error = nil")
+	} else if !errors.Is(err, ErrWasmTrap) {
+		t.Fatalf("Engine.DecodeImage(trapping wasm) error = %v, want ErrWasmTrap", err)
+	}
+	if e.closed {
+		t.Fatalf("Engine is closed after trapping call")
+	}
+	out, err := e.alloc.Call(e.ctx, 1)
+	if err != nil {
+		t.Fatalf("allocator after trapping call error = %v", err)
+	}
+	if got := uint32(out[0]); got != 1024 {
+		t.Fatalf("allocator after trapping call = %d, want 1024", got)
 	}
 }
 
@@ -319,6 +424,10 @@ func isTIFF(b []byte) bool {
 
 func isWebP(b []byte) bool {
 	return len(b) >= 12 && string(b[:4]) == "RIFF" && string(b[8:12]) == "WEBP"
+}
+
+func isJPEG(b []byte) bool {
+	return len(b) >= 4 && b[0] == 0xff && b[1] == 0xd8 && b[len(b)-2] == 0xff && b[len(b)-1] == 0xd9
 }
 
 func TestNewImageFromRawRGBACopiesInput(t *testing.T) {

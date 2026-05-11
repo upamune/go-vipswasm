@@ -35,6 +35,9 @@ if ! grep -q "VIPSWASM_WASI_NO_GDK_PIXBUF_BINS" "$SRC/gdk-pixbuf/meson.build"; t
   perl -0pi -e "s/foreach bin: gdkpixbuf_bin/if host_system != 'wasi' # VIPSWASM_WASI_NO_GDK_PIXBUF_BINS\\nforeach bin: gdkpixbuf_bin/" "$SRC/gdk-pixbuf/meson.build"
   perl -0pi -e "s/set_variable\\(bin_name\\.underscorify\\(\\), bin\\)\\nendforeach/set_variable(bin_name.underscorify(), bin)\\nendforeach\\nendif/" "$SRC/gdk-pixbuf/meson.build"
 fi
+if ! grep -q "VIPSWASM_WASI_NO_PIXOPS_TIMESCALE" "$SRC/gdk-pixbuf/pixops/meson.build"; then
+  perl -0pi -e "s/executable\\('timescale', 'timescale\\.c', dependencies: pixops_dep\\)/if host_system != 'wasi' # VIPSWASM_WASI_NO_PIXOPS_TIMESCALE\\nexecutable('timescale', 'timescale.c', dependencies: pixops_dep)\\nendif/" "$SRC/gdk-pixbuf/pixops/meson.build"
+fi
 if ! grep -q "VIPSWASM_WASI_NO_GMODULE_LOADERS" "$SRC/meson.build"; then
   perl -0pi -e "s/if gmodule_dep\\.type_name\\(\\) == 'pkgconfig'\\n  build_modules = gmodule_dep\\.get_variable\\(pkgconfig: 'gmodule_supported'\\) == 'true'\\nelse\\n  build_modules = subproject\\('glib'\\)\\.get_variable\\('g_module_impl'\\) != '0'\\nendif/if host_system == 'wasi' # VIPSWASM_WASI_NO_GMODULE_LOADERS\\n  build_modules = false\\nelif gmodule_dep.type_name() == 'pkgconfig'\\n  build_modules = gmodule_dep.get_variable(pkgconfig: 'gmodule_supported') == 'true'\\nelse\\n  build_modules = subproject('glib').get_variable('g_module_impl') != '0'\\nendif/" "$SRC/meson.build"
 fi

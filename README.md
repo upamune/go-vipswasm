@@ -94,7 +94,7 @@ package-level Go standard-library codec helpers or pure-Go resize fallbacks.
 Use `SupportedFormats()` for the same matrix from Go code.
 
 - PNG: decode yes; encode yes; decode-time resize yes.
-- JPEG: decode yes; encode not exposed by the current embedded core; decode-time resize yes.
+- JPEG: decode yes; encode yes; decode-time resize yes.
 - WebP: decode yes; encode yes; decode-time resize yes.
 - TIFF: decode yes; encode yes; decode-time resize yes.
 - GIF: decode yes; encode yes; decode-time resize yes.
@@ -104,16 +104,19 @@ Use `SupportedFormats()` for the same matrix from Go code.
 Foreign loaders are exposed through the generic `Engine.DecodeImage` entry
 point. Public `Engine.EncodeImage` uses the libvips foreign savers that run
 under the embedded WASI runtime today: PNG, WebP, TIFF, raw RGBA, GIF,
-and JPEG 2000. JPEG output is intentionally not listed until the embedded core exposes a working libvips JPEG saver.
+JPEG, and JPEG 2000.
 
 The checked-in runtime used by `New` is the full-format `internal/vipswasm.wasm`.
 The extended preset enables the static external packages that are both linkable and loadable
 under wazero today, including archive, CFITSIO, CGIF, EXIF, FFTW, HEIF/AVIF,
-highway, imagequant, JPEG XL, LCMS, ImageMagick, MATIO, NIfTI, OpenEXR,
-OpenJPEG, TIFF, and WebP. JPEG, UHDR, fontconfig/Pango/Cairo, OpenSlide,
-Poppler/PDF, RAW camera formats, and librsvg/SVG are disabled in the checked-in
-full artifact because their current WASI builds pull in exception/SJLJ or other
-runtime paths that do not load cleanly in wazero.
+highway, imagequant, JPEG, JPEG XL, LCMS, ImageMagick, MATIO, NIfTI, OpenEXR,
+OpenJPEG, TIFF, and WebP. The final reactor intentionally avoids LLVM SJLJ tag
+sections so wazero can load the artifact. Fatal codec longjmp paths are converted
+to wasm traps; `Engine` returns `ErrWasmTrap` and reinstantiates its runtime so
+the next call can continue. UHDR, fontconfig/Pango/Cairo, OpenSlide, Poppler/PDF, RAW camera
+formats, and librsvg/SVG are disabled in the checked-in full artifact because
+their current WASI builds still pull in runtime paths that do not load cleanly
+in wazero.
 
 The current WASI libvips probe is reproducible:
 
@@ -191,7 +194,7 @@ return err
 `examples/convert_cli` is a complete command-line example built on the public
 Go API. It decodes every input through the embedded libvips foreign loader,
 applies `ExtractArea` before `ResizeNearest` when cropping is requested, and
-writes PNG/WebP/TIFF/raw/GIF/JPEG 2000 output through `Engine.EncodeImage`.
+writes PNG/JPEG/WebP/TIFF/raw/GIF/JPEG 2000 output through `Engine.EncodeImage`.
 It does not use Go's standard image codecs or pure-Go resize fallbacks.
 
 ```sh

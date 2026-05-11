@@ -53,6 +53,7 @@ both linkable and loadable under wazero today:
 - `heif`
 - `highway`
 - `imagequant`
+- `jpeg`
 - `jpeg-xl`
 - `lcms`
 - `magick`
@@ -66,10 +67,10 @@ both linkable and loadable under wazero today:
 - `tiff`
 - `webp`
 
-`pdfium` is intentionally disabled. JPEG, UHDR, fontconfig/Pango/Cairo,
-OpenSlide, Poppler/PDF, RAW camera formats, and librsvg/SVG are also disabled
-in the checked-in full artifact because their current WASI builds pull in
-exception/SJLJ or other runtime paths that do not load cleanly in wazero.
+`pdfium` is intentionally disabled. UHDR, fontconfig/Pango/Cairo, OpenSlide,
+Poppler/PDF, RAW camera formats, and librsvg/SVG are also disabled in the
+checked-in full artifact because their current WASI builds pull in runtime
+paths that do not load cleanly in wazero.
 
 ## Verification
 

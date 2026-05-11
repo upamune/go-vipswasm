@@ -62,12 +62,34 @@ if [[ ! -d "$SRC/.git" ]]; then
   git clone --depth 1 --branch "$TAG" https://github.com/libvips/libvips "$SRC"
 fi
 
-# libvips always compiles the foreign source list, even when individual
-# external codec features are disabled. Keep disabled JPEG sources away from
-# WASI setjmp.h; enabling JPEG for production will need a real SJLJ strategy.
+# libvips' JPEG loader/saver include setjmp-based error manager definitions.
+# The final reactor link intentionally avoids LLVM SJLJ tag sections so wazero
+# can load the artifact. Fatal JPEG/TIFF codec errors abort the current wasm
+# instance; the Go Engine catches that trap and reinstantiates a clean runtime.
 perl -0pi -e 's/#include <setjmp\.h>\n\n#include <vips\/vips\.h>/#ifdef HAVE_JPEG\n#include <setjmp.h>\n#endif\n\n#include <vips\/vips.h>/' \
   "$SRC/libvips/foreign/jpegload.c" \
   "$SRC/libvips/foreign/jpegsave.c"
+perl -0pi -e 's/\n#ifdef __wasi__\n#define VIPS_WASI_JPEG_SETJMP\(jmp\) 0\n#else\n#define VIPS_WASI_JPEG_SETJMP\(jmp\) setjmp\(jmp\)\n#endif\n//g' \
+  "$SRC/libvips/foreign/jpeg2vips.c" \
+  "$SRC/libvips/foreign/vips2jpeg.c" \
+  "$SRC/libvips/foreign/tiff2vips.c" \
+  "$SRC/libvips/foreign/vips2tiff.c" \
+  "$SRC/libvips/foreign/uhdrload.c"
+perl -0pi -e 's/#include "jpeg\.h"/#include "jpeg.h"\n\n#ifdef __wasi__\n#define VIPS_WASI_JPEG_SETJMP(jmp) 0\n#else\n#define VIPS_WASI_JPEG_SETJMP(jmp) setjmp(jmp)\n#endif/' \
+  "$SRC/libvips/foreign/jpeg2vips.c" \
+  "$SRC/libvips/foreign/vips2jpeg.c" \
+  "$SRC/libvips/foreign/tiff2vips.c" \
+  "$SRC/libvips/foreign/vips2tiff.c" \
+  "$SRC/libvips/foreign/uhdrload.c"
+perl -0pi -e 's/setjmp\(([^)]*->eman\.jmp)\)/VIPS_WASI_JPEG_SETJMP($1)/g' \
+  "$SRC/libvips/foreign/jpeg2vips.c" \
+  "$SRC/libvips/foreign/vips2jpeg.c" \
+  "$SRC/libvips/foreign/uhdrload.c"
+perl -0pi -e 's/setjmp\(eman\.jmp\)/VIPS_WASI_JPEG_SETJMP(eman.jmp)/g' \
+  "$SRC/libvips/foreign/tiff2vips.c" \
+  "$SRC/libvips/foreign/vips2tiff.c"
+perl -0pi -e 's/longjmp\(eman->jmp, 1\);/#ifdef __wasi__\n\tabort();\n#else\n\tlongjmp(eman->jmp, 1);\n#endif/' \
+  "$SRC/libvips/foreign/vips2jpeg.c"
 
 # libpng is built for WASI without setjmp support. Keep the normal libvips PNG
 # error handling on native targets, but avoid png_jmpbuf() references under WASI
@@ -176,7 +198,7 @@ case "$VIPSWASM_LIBVIPS_PRESET" in
   default)
     feature_args+=(
       -Dheif=enabled
-      -Djpeg=disabled
+      -Djpeg=enabled
       -Dtiff=enabled
       -Dwebp=enabled
     )
@@ -192,7 +214,7 @@ case "$VIPSWASM_LIBVIPS_PRESET" in
       -Dheif=enabled
       -Dhighway=enabled
       -Dimagequant=enabled
-      -Djpeg=disabled
+      -Djpeg=enabled
       -Djpeg-xl=enabled
       -Dlcms=enabled
       -Dmagick=enabled
