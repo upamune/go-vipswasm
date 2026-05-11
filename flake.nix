@@ -37,6 +37,7 @@
               pkgs.ninja
               pkgs.glib
               pkgs.gettext
+              pkgs.ripgrep
               pkgs.git
             ];
 

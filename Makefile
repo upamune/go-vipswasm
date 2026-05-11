@@ -293,7 +293,7 @@ vet: ## Run go vet.
 .PHONY: verify-cgo
 verify-cgo: ## Verify the public package builds without cgo.
 	CGO_ENABLED=0 go test ./...
-	@test -z "$$(go list -deps -f '{{if .CgoFiles}}{{.ImportPath}}{{end}}' ./... | sed '/^$$/d')"
+	@test -z "$$(CGO_ENABLED=0 go list -deps -f '{{if .CgoFiles}}{{.ImportPath}}{{end}}' ./... | sed '/^$$/d')"
 
 .PHONY: verify-wasm
 verify-wasm: ## Verify the embedded wasm only imports WASI and wasmify callbacks.
@@ -304,7 +304,7 @@ verify-no-dynamic: ## Verify the package does not use host dynamic library loadi
 	@test -z "$$(rg -n 'dlopen|dlsym|LoadLibrary|plugin\\.Open|#cgo|import \"C\"|libvips\\.so|libvips\\.dylib|vips\\.dll' --glob '*.go' --glob '*.cc' --glob '*.h' . || true)"
 
 .PHONY: audit-production
-audit-production: ## Audit whether this is the requested production libvips package.
+audit-production: probe-glib-link-wasi probe-libvips-link-wasi ## Audit whether this is the requested production libvips package.
 	tools/libvips/production-audit.sh
 
 .PHONY: verify
