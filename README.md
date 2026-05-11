@@ -83,10 +83,10 @@ The embedded wasm artifact is linked against the static WASI libvips probe and
 public image operations execute through libvips. The package also keeps a
 vipsgen-style `GeneratedOperations` catalog for the typed surface, including
 foreign codec operation entries. `Engine.DecodeImage`,
-`Engine.DecodeImageWithOptions`, `Engine.ResizeNearest`, `Engine.ExtractArea`,
-and `Engine.EncodeImage` run inside the wasm runtime. The package-level
-`Decode`, `Image.EncodePNG`, `Image.EncodeJPEG`, and `ResizeNearestGo` helpers
-remain for library callers, but the example CLI intentionally does not use them.
+`Engine.DecodeImageWithOptions`, `Engine.DecodeHEICWithOptions`,
+`Engine.ResizeNearest`, `Engine.ExtractArea`, and `Engine.EncodeImage` run inside
+the wasm runtime. This package is WASM/libvips-only: it does not expose
+package-level Go standard-library codec helpers or pure-Go resize fallbacks.
 `New` uses the full-format core; there is no separate default/full API split.
 
 ### Format support matrix

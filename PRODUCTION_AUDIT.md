@@ -18,7 +18,7 @@ tests that prove real libvips behavior.
 | GObject instance construction under wazero | `make probe-libvips-gobject-wazero` returns `g_object_new(G_TYPE_OBJECT)=1`. | Pass |
 | libvips image type registration under wazero | `make probe-libvips-image-type-wazero` returns `VIPS_TYPE_IMAGE=1`, so basic type registration is not the first failing point. | Pass |
 | Real libvips image object creation under wazero | `make probe-libvips-image-new-wazero` returns `vips_image_new()=1`, and `make probe-libvips-memory-wazero` returns `vips_image_new_from_memory_copy width=1`. | Pass |
-| Real image codecs | `Engine.DecodePNG` exercises libvips' PNG foreign loader under wazero; package-edge generic `Decode`, `EncodePNG`, and `EncodeJPEG` intentionally use Go's standard library. JPEG and libvips PNG save are not exposed by the current package surface. | Pass |
+| Real image codecs | `Engine.DecodePNG` and `Engine.DecodeImage` exercise libvips' foreign loaders under wazero, and `Engine.EncodeImage` exercises libvips savers for PNG/WebP/TIFF/raw/GIF/JPEG 2000. Package-level Go standard-library codec helpers have been removed; JPEG save is not exposed by the current package surface. | Pass |
 | Typed operation surface comparable to vipsgen | `VipsOperation` and `GeneratedOperations` expose a generated-style operation catalog beyond the two executable demo methods. | Pass |
 | Production tests | `go test ./...`, `CGO_ENABLED=0 go test ./...`, probe runtime checks, and import scans pass. | Pass |
 

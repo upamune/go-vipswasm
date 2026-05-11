@@ -1,7 +1,6 @@
 package vipswasm_test
 
 import (
-	"bytes"
 	"context"
 	"image"
 	"image/color"
@@ -28,9 +27,9 @@ func ExampleEngine_ResizeNearest() {
 	if err != nil {
 		log.Fatal(err)
 	}
-	var out bytes.Buffer
-	if err := thumb.EncodePNG(&out); err != nil {
+	out, err := engine.EncodeImage(thumb, "png", nil)
+	if err != nil {
 		log.Fatal(err)
 	}
-	log.Println(thumb.Width, thumb.Height, out.Len() > 0)
+	log.Println(thumb.Width, thumb.Height, len(out) > 0)
 }

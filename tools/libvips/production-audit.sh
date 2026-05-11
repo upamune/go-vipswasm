@@ -28,7 +28,7 @@ has_no_placeholder_core() {
 has_libvips_codecs() {
   ! rg -q -- '-Dpng=disabled' tools/libvips/probe-wasi.sh &&
     rg -q 'vips__png_read_source|vips_pngload|vips_foreign_load_png' tools/wasm vipswasm.go vipswasm_test.go &&
-    rg -q 'DecodePNG|TestDecodeAndEncodePNG' vipswasm.go vipswasm_test.go
+    rg -q 'DecodePNG|TestLibvipsDecodeAndEncodePNG' vipswasm.go vipswasm_test.go
 }
 
 has_generated_surface() {
