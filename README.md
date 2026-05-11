@@ -4,6 +4,8 @@
 
 The package exposes runtime ownership, a typed operation catalog, and libvips-backed image operations (`ResizeNearest`, `ExtractArea`) behind a Go API. Public operations call the `wasmify` generated `w_0_*` bridge exports, and the wasm core is checked in as `internal/vipswasm.wasm`.
 
+`go-vipswasm` uses `github.com/goccy/wasmify` for API discovery and bridge generation: `api-spec.json`, `proto/vipswasm.proto`, `proto/wasmify/options.proto`, and `bridge/api_bridge.cc` are generated from `tools/wasm/vipswasm.h`. The final WASI module is linked by this repository's build scripts with wasmify's generated bridge, the project C++ shim, and statically built libvips/GLib/codec libraries. In other words, wasmify provides the Go-to-WASM bridge; the libvips WASI build and final static link are owned here.
+
 ## Development
 
 Use the repo flake:
