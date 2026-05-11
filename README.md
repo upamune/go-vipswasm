@@ -1,5 +1,9 @@
 # go-vipswasm
 
+<p align="center">
+  <img src="https://i.gyazo.com/23e9674eac498f92210f201639bf8301.png" alt="go-vipswasm logo" width="220">
+</p>
+
 `go-vipswasm` is a CGO-free Go package that runs an embedded libvips-backed WebAssembly image core through `wazero`.
 
 The package exposes runtime ownership, a typed operation catalog, and libvips-backed image operations (`ResizeNearest`, `ExtractArea`) behind a Go API. Public operations call the `wasmify` generated `w_0_*` bridge exports, and the wasm core is checked in as `internal/vipswasm.wasm`.
