@@ -7,9 +7,6 @@ import (
 	"fmt"
 	"image"
 	"image/draw"
-	"image/jpeg"
-	"image/png"
-	"io"
 	"math"
 	"strings"
 	"sync"
@@ -88,11 +85,6 @@ type Image struct {
 	Pix    []byte
 	Width  int
 	Height int
-}
-
-// JPEGOptions configures EncodeJPEG.
-type JPEGOptions struct {
-	Quality int
 }
 
 // EncodeOptions configures Engine.EncodeImage.
@@ -404,19 +396,6 @@ func NewImageFromRawRGBA(pix []byte, width, height int) (*Image, error) {
 	return &Image{Pix: append([]byte(nil), pix...), Width: width, Height: height}, nil
 }
 
-// Decode decodes an image with Go's registered image decoders and converts it to RGBA.
-func Decode(r io.Reader) (*Image, string, error) {
-	src, format, err := image.Decode(r)
-	if err != nil {
-		return nil, "", err
-	}
-	img, err := NewImageFromRGBA(src)
-	if err != nil {
-		return nil, "", err
-	}
-	return img, format, nil
-}
-
 // DecodeImage decodes image bytes through the embedded libvips foreign loader.
 func (e *Engine) DecodeImage(data []byte) (*Image, error) {
 	if err := e.checkInputSize(data); err != nil {
@@ -634,31 +613,6 @@ func (e *Engine) encodeImageWithLibvips(img *Image, format string, opts *EncodeO
 	return append([]byte(nil), out...), nil
 }
 
-// EncodePNG writes the image as PNG.
-func (img *Image) EncodePNG(w io.Writer) error {
-	rgba, err := img.ToRGBA()
-	if err != nil {
-		return err
-	}
-	return png.Encode(w, rgba)
-}
-
-// EncodeJPEG writes the image as JPEG.
-func (img *Image) EncodeJPEG(w io.Writer, opts *JPEGOptions) error {
-	rgba, err := img.ToRGBA()
-	if err != nil {
-		return err
-	}
-	quality := 90
-	if opts != nil && opts.Quality != 0 {
-		quality = opts.Quality
-	}
-	if quality < 1 || quality > 100 {
-		return ErrInvalidGeometry
-	}
-	return jpeg.Encode(w, rgba, &jpeg.Options{Quality: quality})
-}
-
 func libvipsSaveSuffix(format string, opts *EncodeOptions) (string, error) {
 	format = normalizeFormat(format)
 	if format == "" {
@@ -727,29 +681,6 @@ func (e *Engine) ResizeNearest(img *Image, width, height int) (*Image, error) {
 	req = pbAppendUint32(req, 4, uint32(width))
 	req = pbAppendUint32(req, 5, uint32(height))
 	return e.imageOp("w_0_1", width, height, req)
-}
-
-// ResizeNearestGo resizes an image with nearest-neighbor sampling in pure Go.
-func ResizeNearestGo(img *Image, width, height int) (*Image, error) {
-	if err := img.validate(); err != nil {
-		return nil, err
-	}
-	if width <= 0 || height <= 0 {
-		return nil, ErrInvalidGeometry
-	}
-	outLen, err := rgbaLen(width, height)
-	if err != nil {
-		return nil, err
-	}
-	out := make([]byte, outLen)
-	for y := 0; y < height; y++ {
-		sy := y * img.Height / height
-		for x := 0; x < width; x++ {
-			sx := x * img.Width / width
-			copy(out[(y*width+x)*4:], img.Pix[(sy*img.Width+sx)*4:(sy*img.Width+sx+1)*4])
-		}
-	}
-	return &Image{Pix: out, Width: width, Height: height}, nil
 }
 
 // ExtractArea crops an image in WebAssembly.

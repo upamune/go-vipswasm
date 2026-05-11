@@ -72,31 +72,6 @@ func TestResizeNearest(t *testing.T) {
 	assertRGBA(t, out, 2, 2, color.RGBA{R: 255, G: 255, A: 255})
 }
 
-func TestResizeNearestGo(t *testing.T) {
-	src := image.NewRGBA(image.Rect(0, 0, 2, 2))
-	src.SetRGBA(0, 0, color.RGBA{R: 255, A: 255})
-	src.SetRGBA(1, 0, color.RGBA{G: 255, A: 255})
-	src.SetRGBA(0, 1, color.RGBA{B: 255, A: 255})
-	src.SetRGBA(1, 1, color.RGBA{R: 255, G: 255, A: 255})
-	img, err := NewImageFromRGBA(src)
-	if err != nil {
-		t.Fatalf("NewImageFromRGBA() error = %v", err)
-	}
-
-	got, err := ResizeNearestGo(img, 4, 4)
-	if err != nil {
-		t.Fatalf("ResizeNearestGo() error = %v", err)
-	}
-	out, err := got.ToRGBA()
-	if err != nil {
-		t.Fatalf("ToRGBA() error = %v", err)
-	}
-	assertRGBA(t, out, 0, 0, color.RGBA{R: 255, A: 255})
-	assertRGBA(t, out, 2, 0, color.RGBA{G: 255, A: 255})
-	assertRGBA(t, out, 0, 2, color.RGBA{B: 255, A: 255})
-	assertRGBA(t, out, 2, 2, color.RGBA{R: 255, G: 255, A: 255})
-}
-
 func TestWrapWasmMemoryLimit(t *testing.T) {
 	for _, msg := range []string{
 		"wasm error: out of bounds memory access",
@@ -177,7 +152,7 @@ func TestExtractArea(t *testing.T) {
 	assertRGBA(t, out, 1, 1, color.RGBA{R: 100, G: 110, B: 120, A: 255})
 }
 
-func TestDecodeAndEncodePNG(t *testing.T) {
+func TestLibvipsDecodeAndEncodePNG(t *testing.T) {
 	e := newTestEngine(t)
 	defer e.Close()
 
@@ -189,11 +164,11 @@ func TestDecodeAndEncodePNG(t *testing.T) {
 	if err != nil {
 		t.Fatalf("NewImageFromRGBA() error = %v", err)
 	}
-	var encoded bytes.Buffer
-	if err := img.EncodePNG(&encoded); err != nil {
-		t.Fatalf("Image.EncodePNG() error = %v", err)
+	encoded, err := e.EncodeImage(img, "png", nil)
+	if err != nil {
+		t.Fatalf("Engine.EncodeImage(png) error = %v", err)
 	}
-	got, err := e.DecodePNG(encoded.Bytes())
+	got, err := e.DecodePNG(encoded)
 	if err != nil {
 		t.Fatalf("Engine.DecodePNG() error = %v", err)
 	}
@@ -204,7 +179,7 @@ func TestDecodeAndEncodePNG(t *testing.T) {
 	assertRGBA(t, out, 0, 0, color.RGBA{R: 1, G: 2, B: 3, A: 255})
 	assertRGBA(t, out, 1, 0, color.RGBA{R: 4, G: 5, B: 6, A: 255})
 
-	generic, err := e.DecodeImage(encoded.Bytes())
+	generic, err := e.DecodeImage(encoded)
 	if err != nil {
 		t.Fatalf("Engine.DecodeImage() error = %v", err)
 	}
@@ -213,7 +188,7 @@ func TestDecodeAndEncodePNG(t *testing.T) {
 	}
 
 	if e.module.ExportedFunction("vipswasm_load_thumbnail_rgba") != nil {
-		thumb, err := e.DecodeImageWithOptions(encoded.Bytes(), &DecodeOptions{ResizeWidth: 1, ResizeHeight: 1})
+		thumb, err := e.DecodeImageWithOptions(encoded, &DecodeOptions{ResizeWidth: 1, ResizeHeight: 1})
 		if err != nil {
 			t.Fatalf("Engine.DecodeImageWithOptions() error = %v", err)
 		}
@@ -221,7 +196,7 @@ func TestDecodeAndEncodePNG(t *testing.T) {
 			t.Fatalf("Engine.DecodeImageWithOptions() size = %dx%d, want 1x1", thumb.Width, thumb.Height)
 		}
 	} else {
-		if _, err := e.DecodeImageWithOptions(encoded.Bytes(), &DecodeOptions{ResizeWidth: 1, ResizeHeight: 1}); err == nil || !strings.Contains(err.Error(), "vipswasm_load_thumbnail_rgba") {
+		if _, err := e.DecodeImageWithOptions(encoded, &DecodeOptions{ResizeWidth: 1, ResizeHeight: 1}); err == nil || !strings.Contains(err.Error(), "vipswasm_load_thumbnail_rgba") {
 			t.Fatalf("Engine.DecodeImageWithOptions() missing export error = %v, want missing thumbnail export", err)
 		}
 	}
@@ -430,10 +405,6 @@ func TestValidationAndClose(t *testing.T) {
 	}
 	if _, err := NewImageFromRawRGBA([]byte{1, 2, 3}, 1, 1); !errors.Is(err, ErrInvalidImage) {
 		t.Fatalf("NewImageFromRawRGBA(short) error = %v, want ErrInvalidImage", err)
-	}
-	var buf bytes.Buffer
-	if err := img.EncodeJPEG(&buf, &JPEGOptions{Quality: 101}); !errors.Is(err, ErrInvalidGeometry) {
-		t.Fatalf("EncodeJPEG(quality=101) error = %v, want ErrInvalidGeometry", err)
 	}
 	if err := e.Close(); err != nil {
 		t.Fatalf("Close() error = %v", err)
