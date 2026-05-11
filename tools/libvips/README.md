@@ -116,14 +116,17 @@ guards around Unix signal, child-watch, user database, host-info, wakeup,
 spawn, GFile, socket, resolver, and Unix mount paths, and adapt common
 GObject/GParamSpec class and instance initialization signatures.
 
-The libvips source patches keep disabled JPEG sources away from `setjmp.h`,
-use WASI's `posix_memalign` path, pass the GLib WASI stub headers into Meson,
-compile the PNG path against the no-setjmp libpng build, enable zlib/libpng,
-and make `vips_threadpool_run()` execute synchronously on WASI.
+The libvips source patches use WASI's `posix_memalign` path, pass the GLib
+WASI stub headers into Meson, compile the PNG path against the no-setjmp
+libpng build, enable zlib/libpng/JPEG, and make `vips_threadpool_run()`
+execute synchronously on WASI. The final reactor link intentionally avoids
+LLVM WebAssembly SJLJ tag sections so wazero can load the artifact. Fatal
+codec longjmp paths become wasm traps; the Go `Engine` reports `ErrWasmTrap`
+and reinstantiates a clean runtime for subsequent calls.
 
 ## Remaining Work
 
-The current package surface has real libvips resize, extract, image-memory, and
-PNG-load coverage. Future hardening can add JPEG coverage, libvips-backed PNG
-save, and generated executable bindings beyond `ResizeNearest` and
-`ExtractArea`.
+The current package surface has real libvips resize, extract, image-memory,
+PNG/JPEG/WebP encode coverage, and broad format registration checks. Future
+hardening can add more invalid-input codec paths and generated executable
+bindings beyond `ResizeNearest` and `ExtractArea`.

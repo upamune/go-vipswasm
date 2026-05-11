@@ -658,6 +658,11 @@ meson setup "$BUILD" "$SRC" \
   -Dglib_assert=false \
   -Dglib_checks=false
 
+if [[ "$GLIB_USE_LIBFFI" != "1" ]]; then
+  find "$BUILD/meson-uninstalled" "$BUILD/meson-private" -name '*.pc' -type f -print0 |
+    xargs -0 perl -0pi -e 's/(^Requires(?:\.private)?:[^\n]*),?\s*libffi\s*>=\s*[^,\n]+/$1/mg; s/(^Requires(?:\.private)?:\s*),\s*/$1/mg; s/,\s*(\n)/$1/g'
+fi
+
 ninja -C "$BUILD" \
   subprojects/proxy-libintl/libintl.a \
   glib/libglib-2.0.a \
