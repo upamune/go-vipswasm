@@ -1,7 +1,7 @@
 # go-vipswasm
 
 <p align="center">
-  <img src="https://i.gyazo.com/23e9674eac498f92210f201639bf8301.png" alt="go-vipswasm logo" width="220">
+  <img src="https://i.gyazo.com/23e9674eac498f92210f201639bf8301.png" alt="go-vipswasm logo" width="420">
 </p>
 
 `go-vipswasm` is a CGO-free Go package that runs an embedded libvips-backed WebAssembly image core through `wazero`.
